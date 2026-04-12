@@ -3,42 +3,25 @@ from .models import User
 
 
 class LoginForm(forms.Form):
-    email = forms.EmailField(widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Email'}))
-    password = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Password'}))
-
-
-class RegisterForm(forms.ModelForm):
-    password = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Password'}))
-    password2 = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Confirm Password'}), label='Confirm Password')
-
-    class Meta:
-        model = User
-        fields = ['email', 'first_name', 'last_name', 'phone']
-        widgets = {
-            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Email'}),
-            'first_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'First Name'}),
-            'last_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Last Name'}),
-            'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Phone'}),
-        }
-
-    def clean(self):
-        cleaned_data = super().clean()
-        p1 = cleaned_data.get('password')
-        p2 = cleaned_data.get('password2')
-        if p1 and p2 and p1 != p2:
-            raise forms.ValidationError('Passwords do not match')
-        return cleaned_data
-
-    def save(self, commit=True):
-        user = super().save(commit=False)
-        user.set_password(self.cleaned_data['password'])
-        if commit:
-            user.save()
-        return user
+    email = forms.EmailField(widget=forms.EmailInput(attrs={
+        'class': 'form-control',
+        'placeholder': 'Email'
+    }))
+    password = forms.CharField(widget=forms.PasswordInput(attrs={
+        'class': 'form-control',
+        'placeholder': 'Password'
+    }))
 
 
 class UserCreateForm(forms.ModelForm):
-    password = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'form-control'}))
+    password = forms.CharField(
+        required=False,
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Password (leave blank to keep current)'
+        }),
+        help_text='Leave blank when editing to keep current password'
+    )
 
     class Meta:
         model = User
@@ -50,3 +33,16 @@ class UserCreateForm(forms.ModelForm):
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
             'role': forms.Select(attrs={'class': 'form-control'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Only owner and staff roles
+        self.fields['role'].choices = [
+            ('owner', 'Owner'),
+            ('staff', 'Staff'),
+        ]
+        if self.instance and self.instance.pk:
+            self.fields['password'].required = False
+        else:
+            self.fields['password'].required = True
+            self.fields['password'].widget.attrs['placeholder'] = 'Password'

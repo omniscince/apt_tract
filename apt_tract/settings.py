@@ -16,6 +16,10 @@ ALLOWED_HOSTS = ['*']
 CSRF_TRUSTED_ORIGINS = [
     'https://backapt.com',
     'https://www.backapt.com',
+    'https://apttract.com',
+    'https://www.apttract.com',
+    'https://devapttract.com',
+    'https://www.devapttract.com',
 ]
 
 INSTALLED_APPS = [
@@ -112,3 +116,16 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
+
+# HST Rate - 13% for apttract.com
+from decimal import Decimal
+HST_RATE = Decimal('0.13')
+
+# Email settings
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'autoprotinting@gmail.com')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('EMAIL_HOST_USER', 'autoprotinting@gmail.com')

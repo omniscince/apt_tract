@@ -8,21 +8,21 @@ from users.models import User
 class Invoice(models.Model):
     STATUS_CHOICES = [
         ('draft', 'Draft'),
-        ('final', 'Final'),
-        ('paid', 'Paid'),
+        ('sent', 'Sent'),
+        ('declined', 'Declined'),
     ]
 
     invoice_number = models.CharField(max_length=50, unique=True)
-    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='invoices', null=True, blank=True)
+    customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True, related_name='invoices')
     customer_name = models.CharField(max_length=200, blank=True)
-    car = models.ForeignKey(Car, on_delete=models.CASCADE, related_name='invoices', null=True, blank=True)
+    car = models.ForeignKey(Car, on_delete=models.SET_NULL, null=True, blank=True, related_name='invoices')
     car_info = models.CharField(max_length=200, blank=True)
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_invoices')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='final')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     invoice_date = models.DateField(default=timezone.now)
     due_date = models.DateField(blank=True, null=True)
     po_number = models.CharField(max_length=50, blank=True, default='N/A')
-    work_order_close_date = models.DateField(blank=True, null=True)
+    last_edit_date = models.DateField(blank=True, null=True)
     notes = models.TextField(blank=True)
     work_completed_by = models.ForeignKey(
         'users.User',
@@ -32,6 +32,7 @@ class Invoice(models.Model):
         related_name='completed_invoices'
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f'Invoice #{self.invoice_number} - {self.get_customer_display()}'
@@ -43,7 +44,7 @@ class Invoice(models.Model):
 
     def get_car_display(self):
         if self.car:
-            return str(self.car)
+            return self.car.get_display_with_details()
         return self.car_info or '—'
 
     @property
@@ -53,7 +54,9 @@ class Invoice(models.Model):
     @property
     def hst(self):
         from decimal import Decimal
-        return round(self.subtotal * Decimal('0.13'), 2)
+        from django.conf import settings
+        rate = getattr(settings, 'HST_RATE', Decimal('0.13'))
+        return round(self.subtotal * Decimal(str(rate)), 2)
 
     @property
     def total(self):
@@ -73,6 +76,9 @@ class Invoice(models.Model):
                     self.invoice_number = f'{year}-000001'
             else:
                 self.invoice_number = f'{year}-000001'
+        if not self.due_date:
+            from dateutil.relativedelta import relativedelta
+            self.due_date = self.invoice_date + relativedelta(months=1)
         super().save(*args, **kwargs)
 
     class Meta:

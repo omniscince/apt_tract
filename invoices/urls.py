@@ -9,8 +9,9 @@ urlpatterns = [
     path('invoices/<int:pk>/edit/', views.InvoiceEditView.as_view(), name='invoice_edit'),
     path('invoices/<int:pk>/pdf/', views.InvoicePDFView.as_view(), name='invoice_pdf'),
     path('invoices/<int:pk>/delete/', views.InvoiceDeleteView.as_view(), name='invoice_delete'),
-    path('reports/monthly/', views.MonthlyReportView.as_view(), name='monthly_report'),
-    path('reports/monthly/pdf/', views.MonthlyReportPDFView.as_view(), name='monthly_report_pdf'),
+    path('invoices/<int:pk>/action/', views.InvoiceActionView.as_view(), name='invoice_action'),
+    path('reports/', views.MonthlyReportView.as_view(), name='monthly_report'),
+    path('reports/pdf/', views.MonthlyReportPDFView.as_view(), name='monthly_report_pdf'),
+    path('reports/send-statement/', views.SendStatementView.as_view(), name='send_statement'),
     path('api/customers/search/', views.CustomerSearchView.as_view(), name='customer_search'),
-    path('api/customers/<int:customer_id>/cars/', views.CarsByCustomerView.as_view(), name='cars_by_customer'),
 ]
