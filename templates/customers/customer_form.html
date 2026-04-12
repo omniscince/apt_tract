@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }} - AutoPro{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="card p-4">
+    <form method="post">
+        {% csrf_token %}
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Company/Customer Name *</label>
+                {{ form.name }}
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Phone</label>
+                {{ form.phone }}
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Email</label>
+                {{ form.email }}
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Address</label>
+                {{ form.address }}
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">City</label>
+                {{ form.city }}
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Province</label>
+                {{ form.province }}
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Postal Code</label>
+                {{ form.postal_code }}
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Country</label>
+                {{ form.country }}
+            </div>
+        </div>
+        <div class="d-flex gap-2 mt-4">
+            <button type="submit" class="btn btn-primary">Save</button>
+            <a href="{% url 'customer_list' %}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

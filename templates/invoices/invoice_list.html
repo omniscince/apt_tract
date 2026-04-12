@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% block title %}Invoices - AutoPro{% endblock %}
+{% block page_title %}Invoices{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4>All Invoices</h4>
+    {% if user.role in 'owner,staff' %}
+    <a href="{% url 'invoice_create' %}" class="btn btn-primary">
+        <i class="bi bi-plus"></i> New Invoice
+    </a>
+    {% endif %}
+</div>
+
+<!-- Filters -->
+<div class="card p-3 mb-4">
+    <form method="get" class="row g-3 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label">Customer</label>
+            <select name="customer" class="form-control">
+                <option value="">All Customers</option>
+                {% for c in customers %}
+                <option value="{{ c.pk }}" {% if request.GET.customer == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Month</label>
+            <input type="number" name="month" class="form-control" placeholder="1-12" value="{{ request.GET.month }}" min="1" max="12">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Year</label>
+            <input type="number" name="year" class="form-control" placeholder="2026" value="{{ request.GET.year }}">
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-outline-primary w-100">Filter</button>
+        </div>
+        <div class="col-md-2">
+            <a href="{% url 'invoice_list' %}" class="btn btn-outline-secondary w-100">Clear</a>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Invoice #</th>
+                    <th>Customer</th>
+                    <th>Car</th>
+                    <th>Date</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for inv in invoices %}
+                <tr>
+                    <td><strong>{{ inv.invoice_number }}</strong></td>
+                    <td>{{ inv.customer.name }}</td>
+                    <td>{{ inv.car.make }} {{ inv.car.model }}</td>
+                    <td>{{ inv.invoice_date|date:"m/d/Y" }}</td>
+                    <td>${{ inv.total }}</td>
+                    <td><span class="badge bg-success">{{ inv.status|upper }}</span></td>
+                    <td>
+                        <a href="{% url 'invoice_detail' inv.pk %}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                        <a href="{% url 'invoice_pdf' inv.pk %}" class="btn btn-sm btn-outline-success">
+                            <i class="bi bi-file-pdf"></i>
+                        </a>
+                        {% if user.role == 'owner' %}
+                        <form method="post" action="{% url 'invoice_delete' inv.pk %}" class="d-inline"
+                              onsubmit="return confirm('Delete this invoice?')">
+                            {% csrf_token %}
+                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="text-center text-muted py-4">No invoices found</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
