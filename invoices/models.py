@@ -13,8 +13,10 @@ class Invoice(models.Model):
     ]
 
     invoice_number = models.CharField(max_length=50, unique=True)
-    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='invoices')
-    car = models.ForeignKey(Car, on_delete=models.CASCADE, related_name='invoices')
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='invoices', null=True, blank=True)
+    customer_name = models.CharField(max_length=200, blank=True)
+    car = models.ForeignKey(Car, on_delete=models.CASCADE, related_name='invoices', null=True, blank=True)
+    car_info = models.CharField(max_length=200, blank=True)
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_invoices')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='final')
     invoice_date = models.DateField(default=timezone.now)
@@ -32,7 +34,17 @@ class Invoice(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f'Invoice #{self.invoice_number} - {self.customer.name}'
+        return f'Invoice #{self.invoice_number} - {self.get_customer_display()}'
+
+    def get_customer_display(self):
+        if self.customer:
+            return self.customer.name
+        return self.customer_name or 'Unknown'
+
+    def get_car_display(self):
+        if self.car:
+            return str(self.car)
+        return self.car_info or '—'
 
     @property
     def subtotal(self):
