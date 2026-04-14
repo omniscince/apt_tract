@@ -179,13 +179,6 @@ def generate_invoice_pdf(response, invoice):
     story.append(items_table)
     story.append(Spacer(1, 0.15*inch))
 
-    # Comments
-    if invoice.notes:
-        story.append(Paragraph("<b>Comments:</b>", bold_style))
-        story.append(Spacer(1, 0.05*inch))
-        story.append(Paragraph(invoice.notes, normal_style))
-        story.append(Spacer(1, 0.1*inch))
-
     story.append(Paragraph("Thank you for your business", normal_style))
     story.append(Spacer(1, 0.15*inch))
 

@@ -13,7 +13,7 @@ class CustomerListView(View):
         customers = Customer.objects.all()
         q = request.GET.get('q', '')
         if q:
-            customers = customers.filter(name__icontains=q)
+            customers = customers.filter(name__icontains=q) | customers.filter(company__icontains=q)
         return render(request, 'customers/customer_list.html', {
             'customers': customers,
             'q': q,
@@ -23,6 +23,9 @@ class CustomerListView(View):
 @method_decorator(login_required, name='dispatch')
 class CustomerCreateView(View):
     def get(self, request):
+        if request.user.role != 'owner':
+            messages.error(request, 'Access denied')
+            return redirect('customer_list')
         form = CustomerForm()
         email_formset = CustomerEmailFormSet()
         return render(request, 'customers/customer_form.html', {
@@ -32,6 +35,9 @@ class CustomerCreateView(View):
         })
 
     def post(self, request):
+        if request.user.role != 'owner':
+            messages.error(request, 'Access denied')
+            return redirect('customer_list')
         form = CustomerForm(request.POST)
         email_formset = CustomerEmailFormSet(request.POST)
         if form.is_valid() and email_formset.is_valid():
@@ -63,6 +69,9 @@ class CustomerDetailView(View):
 @method_decorator(login_required, name='dispatch')
 class CustomerEditView(View):
     def get(self, request, pk):
+        if request.user.role != 'owner':
+            messages.error(request, 'Access denied')
+            return redirect('customer_list')
         customer = get_object_or_404(Customer, pk=pk)
         form = CustomerForm(instance=customer)
         email_formset = CustomerEmailFormSet(instance=customer)
@@ -74,6 +83,9 @@ class CustomerEditView(View):
         })
 
     def post(self, request, pk):
+        if request.user.role != 'owner':
+            messages.error(request, 'Access denied')
+            return redirect('customer_list')
         customer = get_object_or_404(Customer, pk=pk)
         form = CustomerForm(request.POST, instance=customer)
         email_formset = CustomerEmailFormSet(request.POST, instance=customer)
@@ -94,6 +106,9 @@ class CustomerEditView(View):
 @method_decorator(login_required, name='dispatch')
 class CustomerDeleteView(View):
     def post(self, request, pk):
+        if request.user.role != 'owner':
+            messages.error(request, 'Access denied')
+            return redirect('customer_list')
         customer = get_object_or_404(Customer, pk=pk)
         customer.delete()
         messages.success(request, 'Customer deleted')

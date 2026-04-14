@@ -8,8 +8,8 @@ from users.models import User
 class Invoice(models.Model):
     STATUS_CHOICES = [
         ('draft', 'Draft'),
-        ('sent', 'Sent'),
-        ('declined', 'Declined'),
+        ('final', 'Final'),
+        ('cancelled', 'Cancelled'),
     ]
 
     invoice_number = models.CharField(max_length=50, unique=True)
@@ -18,10 +18,10 @@ class Invoice(models.Model):
     car = models.ForeignKey(Car, on_delete=models.SET_NULL, null=True, blank=True, related_name='invoices')
     car_info = models.CharField(max_length=200, blank=True)
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_invoices')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='final')
     invoice_date = models.DateField(default=timezone.now)
     due_date = models.DateField(blank=True, null=True)
-    po_number = models.CharField(max_length=50, blank=True, default='N/A')
+    po_number = models.CharField(max_length=50, blank=True, default='')
     last_edit_date = models.DateField(blank=True, null=True)
     notes = models.TextField(blank=True)
     work_completed_by = models.ForeignKey(
@@ -76,7 +76,7 @@ class Invoice(models.Model):
                     self.invoice_number = f'{year}-000001'
             else:
                 self.invoice_number = f'{year}-000001'
-        if not self.due_date:
+        if not self.due_date and self.invoice_date:
             from dateutil.relativedelta import relativedelta
             self.due_date = self.invoice_date + relativedelta(months=1)
         super().save(*args, **kwargs)

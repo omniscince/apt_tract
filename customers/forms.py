@@ -25,13 +25,12 @@ class CustomerForm(forms.ModelForm):
     class Meta:
         model = Customer
         fields = [
-            'name', 'company', 'business_number',
+            'name', 'business_number',
             'phone', 'address', 'city', 'province',
             'postal_code', 'country'
         ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Full Name'}),
-            'company': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Company Name'}),
             'business_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Business Number (BN)'}),
             'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Phone'}),
             'address': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Address'}),

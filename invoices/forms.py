@@ -17,7 +17,7 @@ class InvoiceForm(forms.ModelForm):
         label='Customer'
     )
     car_make = forms.CharField(
-        required=True,
+        required=False,
         widget=forms.TextInput(attrs={
             'class': 'form-control',
             'placeholder': 'Make (e.g. BMW)',
@@ -34,23 +34,16 @@ class InvoiceForm(forms.ModelForm):
         }),
         label='Car Model'
     )
-    car_year = forms.IntegerField(
-        required=False,
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Year (e.g. 2020)',
-            'id': 'id_car_year',
-        }),
-        label='Car Year'
-    )
     car_vin = forms.CharField(
         required=False,
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': 'VIN Number',
+            'placeholder': 'VIN (min 8 characters)',
             'id': 'id_car_vin',
+            'minlength': '8',
         }),
-        label='VIN'
+        label='VIN',
+        min_length=0,
     )
     car_stock = forms.CharField(
         required=False,
@@ -71,9 +64,9 @@ class InvoiceForm(forms.ModelForm):
         widgets = {
             'invoice_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'due_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'po_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'po_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'PO Number'}),
             'last_edit_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Internal notes (not shown in PDF)'}),
             'work_completed_by': forms.Select(attrs={'class': 'form-control'}),
         }
 
@@ -84,17 +77,21 @@ class InvoiceForm(forms.ModelForm):
             self.fields['invoice_date'].initial = today
             self.fields['due_date'].initial = today + relativedelta(months=1)
 
-        # If editing, prefill customer and car fields
         if self.instance and self.instance.pk:
             self.fields['customer_name'].initial = self.instance.get_customer_display()
             if self.instance.car:
                 self.fields['car_make'].initial = self.instance.car.make
                 self.fields['car_model'].initial = self.instance.car.model
-                self.fields['car_year'].initial = self.instance.car.year
                 self.fields['car_vin'].initial = self.instance.car.vin
                 self.fields['car_stock'].initial = self.instance.car.stock_number
             elif self.instance.car_info:
                 self.fields['car_make'].initial = self.instance.car_info
+
+    def clean_car_vin(self):
+        vin = self.cleaned_data.get('car_vin', '').strip()
+        if vin and len(vin) < 8:
+            raise forms.ValidationError('VIN must be at least 8 characters.')
+        return vin
 
 
 class InvoiceItemForm(forms.ModelForm):

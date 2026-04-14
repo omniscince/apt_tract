@@ -16,15 +16,12 @@ from cars.models import Car
 
 
 def get_or_create_customer_and_car(form, invoice):
-    """Helper: find or create customer and car from form data"""
     customer_name = form.cleaned_data.get('customer_name', '').strip()
     car_make = form.cleaned_data.get('car_make', '').strip()
     car_model = form.cleaned_data.get('car_model', '').strip()
-    car_year = form.cleaned_data.get('car_year')
     car_vin = form.cleaned_data.get('car_vin', '').strip()
     car_stock = form.cleaned_data.get('car_stock', '').strip()
 
-    # Find existing customer by name (case-insensitive)
     customer = Customer.objects.filter(name__iexact=customer_name).first()
     if not customer:
         invoice.customer_name = customer_name
@@ -33,7 +30,6 @@ def get_or_create_customer_and_car(form, invoice):
         invoice.customer = customer
         invoice.customer_name = ''
 
-    # Find or create car
     if customer and car_vin:
         car = Car.objects.filter(customer=customer, vin__iexact=car_vin).first()
         if not car:
@@ -41,10 +37,15 @@ def get_or_create_customer_and_car(form, invoice):
                 customer=customer,
                 make=car_make,
                 model=car_model,
-                year=car_year,
                 vin=car_vin,
                 stock_number=car_stock,
             )
+        else:
+            # Update car make/model if changed
+            car.make = car_make
+            car.model = car_model
+            car.stock_number = car_stock
+            car.save()
         invoice.car = car
         invoice.car_info = ''
     elif customer and car_make:
@@ -58,10 +59,14 @@ def get_or_create_customer_and_car(form, invoice):
                 customer=customer,
                 make=car_make,
                 model=car_model,
-                year=car_year,
                 vin=car_vin,
                 stock_number=car_stock,
             )
+        else:
+            car.make = car_make
+            car.model = car_model
+            car.stock_number = car_stock
+            car.save()
         invoice.car = car
         invoice.car_info = ''
     else:
@@ -69,8 +74,6 @@ def get_or_create_customer_and_car(form, invoice):
         parts = [car_make]
         if car_model:
             parts.append(car_model)
-        if car_year:
-            parts.append(str(car_year))
         if car_vin:
             parts.append(f'VIN: {car_vin}')
         if car_stock:
@@ -84,10 +87,15 @@ def get_or_create_customer_and_car(form, invoice):
 class DashboardView(View):
     def get(self, request):
         user = request.user
+        if user.role == 'staff':
+            invoices_qs = Invoice.objects.filter(created_by=user)
+        else:
+            invoices_qs = Invoice.objects.all()
+
         context = {
-            'total_invoices': Invoice.objects.count(),
+            'total_invoices': invoices_qs.count(),
             'total_customers': Customer.objects.count(),
-            'recent_invoices': Invoice.objects.select_related(
+            'recent_invoices': invoices_qs.select_related(
                 'customer', 'car', 'created_by'
             ).order_by('-created_at')[:10],
         }
@@ -97,21 +105,25 @@ class DashboardView(View):
 @method_decorator(login_required, name='dispatch')
 class InvoiceListView(View):
     def get(self, request):
-        invoices = Invoice.objects.all().select_related('customer', 'car', 'created_by')
+        user = request.user
+        if user.role == 'staff':
+            invoices = Invoice.objects.filter(created_by=user).select_related('customer', 'car', 'created_by')
+        else:
+            invoices = Invoice.objects.all().select_related('customer', 'car', 'created_by')
 
-        # Filters
         q = request.GET.get('q', '')
         customer_id = request.GET.get('customer')
         staff_id = request.GET.get('staff')
         month = request.GET.get('month')
         year = request.GET.get('year')
         vin = request.GET.get('vin')
+        status = request.GET.get('status')
 
         if q:
             invoices = invoices.filter(invoice_number__icontains=q)
         if customer_id:
             invoices = invoices.filter(customer_id=customer_id)
-        if staff_id:
+        if staff_id and user.role != 'staff':
             invoices = invoices.filter(created_by_id=staff_id)
         if month:
             invoices = invoices.filter(invoice_date__month=month)
@@ -119,6 +131,8 @@ class InvoiceListView(View):
             invoices = invoices.filter(invoice_date__year=year)
         if vin:
             invoices = invoices.filter(car__vin__icontains=vin)
+        if status:
+            invoices = invoices.filter(status=status)
 
         from users.models import User
         customers = Customer.objects.all()
@@ -147,11 +161,15 @@ class InvoiceCreateView(View):
         if form.is_valid() and formset.is_valid():
             invoice = form.save(commit=False)
             invoice.created_by = request.user
-            invoice.status = 'draft'
+            invoice.status = 'final'
             invoice = get_or_create_customer_and_car(form, invoice)
             invoice.save()
             formset.instance = invoice
-            formset.save()
+            # Only save non-empty items
+            for item_form in formset:
+                if item_form.cleaned_data.get('description') and item_form.cleaned_data.get('price') is not None:
+                    if not item_form.cleaned_data.get('DELETE', False):
+                        item_form.save()
             messages.success(request, f'Invoice #{invoice.invoice_number} created!')
             return redirect('invoice_detail', pk=invoice.pk)
         return render(request, 'invoices/invoice_form.html', {
@@ -165,6 +183,9 @@ class InvoiceCreateView(View):
 class InvoiceEditView(View):
     def get(self, request, pk):
         invoice = get_object_or_404(Invoice, pk=pk)
+        if request.user.role == 'staff' and invoice.created_by != request.user:
+            messages.error(request, 'Access denied')
+            return redirect('invoice_list')
         form = InvoiceForm(instance=invoice)
         formset = InvoiceItemFormSet(instance=invoice)
         return render(request, 'invoices/invoice_form.html', {
@@ -176,6 +197,9 @@ class InvoiceEditView(View):
 
     def post(self, request, pk):
         invoice = get_object_or_404(Invoice, pk=pk)
+        if request.user.role == 'staff' and invoice.created_by != request.user:
+            messages.error(request, 'Access denied')
+            return redirect('invoice_list')
         form = InvoiceForm(request.POST, instance=invoice)
         formset = InvoiceItemFormSet(request.POST, instance=invoice)
         if form.is_valid() and formset.is_valid():
@@ -197,25 +221,27 @@ class InvoiceEditView(View):
 class InvoiceDetailView(View):
     def get(self, request, pk):
         invoice = get_object_or_404(Invoice, pk=pk)
+        if request.user.role == 'staff' and invoice.created_by != request.user:
+            messages.error(request, 'Access denied')
+            return redirect('invoice_list')
         return render(request, 'invoices/invoice_detail.html', {'invoice': invoice})
 
 
 @method_decorator(login_required, name='dispatch')
 class InvoiceActionView(View):
-    """Handles send, decline, draft actions"""
     def post(self, request, pk):
         invoice = get_object_or_404(Invoice, pk=pk)
         action = request.POST.get('action')
 
         if action == 'send':
-            emails = []
-            if invoice.customer:
-                emails = invoice.customer.get_all_emails()
+            emails = request.POST.getlist('emails')
             if not emails:
-                messages.error(request, 'No email address found for this customer')
+                if invoice.customer:
+                    emails = invoice.customer.get_all_emails()
+            if not emails:
+                messages.error(request, 'No email address found')
                 return redirect('invoice_detail', pk=pk)
 
-            # Generate PDF in memory
             buffer = io.BytesIO()
             generate_invoice_pdf(buffer, invoice)
             buffer.seek(0)
@@ -243,20 +269,23 @@ class InvoiceActionView(View):
                 buffer.read(),
                 'application/pdf'
             )
-            email_msg.send()
-            invoice.status = 'sent'
-            invoice.save()
-            messages.success(request, f'Invoice sent to {", ".join(emails)}')
+            try:
+                email_msg.send()
+                invoice.status = 'final'
+                invoice.save()
+                messages.success(request, f'Invoice sent to {", ".join(emails)}')
+            except Exception as e:
+                messages.error(request, f'Failed to send email: {str(e)}')
 
-        elif action == 'decline':
-            invoice.status = 'declined'
+        elif action == 'cancel':
+            invoice.status = 'cancelled'
             invoice.save()
-            messages.success(request, 'Invoice declined')
+            messages.success(request, 'Invoice cancelled')
 
-        elif action == 'draft':
-            invoice.status = 'draft'
+        elif action == 'final':
+            invoice.status = 'final'
             invoice.save()
-            messages.success(request, 'Invoice saved as draft')
+            messages.success(request, 'Invoice marked as final')
 
         return redirect('invoice_detail', pk=pk)
 
@@ -275,6 +304,9 @@ class InvoicePDFView(View):
 class InvoiceDeleteView(View):
     def post(self, request, pk):
         invoice = get_object_or_404(Invoice, pk=pk)
+        if request.user.role == 'staff' and invoice.created_by != request.user:
+            messages.error(request, 'Access denied')
+            return redirect('invoice_list')
         invoice.delete()
         messages.success(request, 'Invoice deleted')
         return redirect('invoice_list')
@@ -284,7 +316,7 @@ class InvoiceDeleteView(View):
 class CustomerSearchView(View):
     def get(self, request):
         q = request.GET.get('q', '')
-        if len(q) >= 2:
+        if len(q) >= 1:
             customers = Customer.objects.filter(name__icontains=q)[:10]
             data = [{
                 'id': c.id,
@@ -293,7 +325,7 @@ class CustomerSearchView(View):
                 'phone': c.phone or '',
                 'cars': [{'id': car.id, 'display': car.get_display_with_details(),
                           'make': car.make, 'model': car.model,
-                          'year': car.year, 'vin': car.vin,
+                          'vin': car.vin,
                           'stock': car.stock_number}
                          for car in c.cars.all()[:5]]
             } for c in customers]
@@ -307,7 +339,6 @@ class MonthlyReportView(View):
     def get(self, request):
         invoices = Invoice.objects.all().select_related('customer', 'car', 'created_by')
 
-        # Filters
         customer_id = request.GET.get('customer')
         staff_id = request.GET.get('staff')
         month = request.GET.get('month')
@@ -415,6 +446,9 @@ class SendStatementView(View):
             to=emails,
         )
         email_msg.attach('statement.pdf', buffer.read(), 'application/pdf')
-        email_msg.send()
-        messages.success(request, f'Statement sent to {", ".join(emails)}')
+        try:
+            email_msg.send()
+            messages.success(request, f'Statement sent to {", ".join(emails)}')
+        except Exception as e:
+            messages.error(request, f'Failed to send: {str(e)}')
         return redirect('monthly_report')
