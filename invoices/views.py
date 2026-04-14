@@ -338,7 +338,7 @@ class MonthlyReportView(View):
         customer_id = request.GET.get('customer')
         staff_id = request.GET.get('staff')
         month = request.GET.get('month')
-        year = request.GET.get('year', timezone.now().year)
+        year = request.GET.get('year', '')
         date_from = request.GET.get('date_from')
         date_to = request.GET.get('date_to')
         vin = request.GET.get('vin')
