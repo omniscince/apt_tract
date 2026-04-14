@@ -14,12 +14,16 @@ class CarListView(View):
         cars = Car.objects.all().select_related('customer')
         q = request.GET.get('q', '')
         vin = request.GET.get('vin', '')
+        stock = request.GET.get('stock', '')
         customer_id = request.GET.get('customer')
 
         if q:
-            cars = cars.filter(make__icontains=q) | cars.filter(model__icontains=q)
+            customers_matching = Customer.objects.filter(name__icontains=q)
+            cars = cars.filter(customer__in=customers_matching)
         if vin:
             cars = cars.filter(vin__icontains=vin)
+        if stock:
+            cars = cars.filter(stock_number__icontains=stock)
         if customer_id:
             cars = cars.filter(customer_id=customer_id)
 
@@ -29,6 +33,7 @@ class CarListView(View):
             'customers': customers,
             'q': q,
             'vin': vin,
+            'stock': stock,
         })
 
 
@@ -55,7 +60,17 @@ class CarCreateView(View):
     def post(self, request):
         form = CarForm(request.POST)
         if form.is_valid():
-            car = form.save()
+            car = form.save(commit=False)
+            customer_name = form.cleaned_data.get('customer_name', '').strip()
+            customer = Customer.objects.filter(name__iexact=customer_name).first()
+            if not customer:
+                messages.error(request, f'Customer "{customer_name}" not found')
+                return render(request, 'cars/car_form.html', {
+                    'form': form,
+                    'title': 'Add Car',
+                })
+            car.customer = customer
+            car.save()
             messages.success(request, f'Car {car} added!')
             return redirect('car_detail', pk=car.pk)
         return render(request, 'cars/car_form.html', {
@@ -79,7 +94,18 @@ class CarEditView(View):
         car = get_object_or_404(Car, pk=pk)
         form = CarForm(request.POST, instance=car)
         if form.is_valid():
-            form.save()
+            car = form.save(commit=False)
+            customer_name = form.cleaned_data.get('customer_name', '').strip()
+            customer = Customer.objects.filter(name__iexact=customer_name).first()
+            if not customer:
+                messages.error(request, f'Customer "{customer_name}" not found')
+                return render(request, 'cars/car_form.html', {
+                    'form': form,
+                    'title': 'Edit Car',
+                    'car': car,
+                })
+            car.customer = customer
+            car.save()
             messages.success(request, f'Car {car} updated!')
             return redirect('car_detail', pk=car.pk)
         return render(request, 'cars/car_form.html', {

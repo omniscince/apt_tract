@@ -7,28 +7,31 @@
         {% csrf_token %}
         <div class="row g-3">
             <div class="col-md-12">
-                <label class="form-label">Customer *</label>
-                {{ form.customer }}
+                <label class="form-label fw-bold">Customer *</label>
+                <div class="position-relative">
+                    {{ form.customer_name }}
+                    <div id="customer-suggestions" class="list-group position-absolute w-100" style="z-index:1000;display:none;"></div>
+                </div>
             </div>
-            <div class="col-md-6">
-                <label class="form-label">Make *</label>
+            <div class="col-md-4">
+                <label class="form-label fw-bold">Make *</label>
                 {{ form.make }}
             </div>
-            <div class="col-md-6">
-                <label class="form-label">Model *</label>
+            <div class="col-md-4">
+                <label class="form-label">Model</label>
                 {{ form.model }}
             </div>
             <div class="col-md-4">
                 <label class="form-label">Year</label>
                 {{ form.year }}
             </div>
-            <div class="col-md-4">
-                <label class="form-label">Stock Number</label>
-                {{ form.stock_number }}
-            </div>
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <label class="form-label">VIN</label>
                 {{ form.vin }}
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Stock #</label>
+                {{ form.stock_number }}
             </div>
         </div>
         <div class="d-flex gap-2 mt-4">
@@ -37,4 +40,46 @@
         </div>
     </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const input = document.getElementById('id_car_customer_name');
+const suggestions = document.getElementById('customer-suggestions');
+
+input.addEventListener('input', function() {
+    const q = this.value.trim();
+    if (q.length < 1) {
+        suggestions.style.display = 'none';
+        return;
+    }
+    fetch(`/api/customers/search/?q=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(data => {
+            suggestions.innerHTML = '';
+            if (data.results.length === 0) {
+                suggestions.style.display = 'none';
+                return;
+            }
+            data.results.forEach(c => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'list-group-item list-group-item-action';
+                item.innerHTML = `<strong>${c.name}</strong>${c.company ? ' — ' + c.company : ''} ${c.phone ? '<small class="text-muted">' + c.phone + '</small>' : ''}`;
+                item.addEventListener('click', function() {
+                    input.value = c.name;
+                    suggestions.style.display = 'none';
+                });
+                suggestions.appendChild(item);
+            });
+            suggestions.style.display = 'block';
+        });
+});
+
+document.addEventListener('click', function(e) {
+    if (!input.contains(e.target) && !suggestions.contains(e.target)) {
+        suggestions.style.display = 'none';
+    }
+});
+</script>
 {% endblock %}
