@@ -165,11 +165,7 @@ class InvoiceCreateView(View):
             invoice = get_or_create_customer_and_car(form, invoice)
             invoice.save()
             formset.instance = invoice
-            # Only save non-empty items
-            for item_form in formset:
-                if item_form.cleaned_data.get('description') and item_form.cleaned_data.get('price') is not None:
-                    if not item_form.cleaned_data.get('DELETE', False):
-                        item_form.save()
+            formset.save()
             messages.success(request, f'Invoice #{invoice.invoice_number} created!')
             return redirect('invoice_detail', pk=invoice.pk)
         return render(request, 'invoices/invoice_form.html', {
