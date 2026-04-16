@@ -265,13 +265,19 @@ class InvoiceActionView(View):
                 buffer.read(),
                 'application/pdf'
             )
-            try:
-                email_msg.send()
-                invoice.status = 'final'
-                invoice.save()
-                messages.success(request, f'Invoice sent to {", ".join(emails)}')
-            except Exception as e:
-                messages.error(request, f'Failed to send email: {str(e)}')
+            import threading
+            def send_email_async():
+                try:
+                    email_msg.send()
+                except Exception:
+                    pass
+
+            thread = threading.Thread(target=send_email_async)
+            thread.daemon = True
+            thread.start()
+            invoice.status = 'final'
+            invoice.save()
+            messages.success(request, f'Invoice sent to {", ".join(emails)}')
 
         elif action == 'cancel':
             invoice.status = 'cancelled'
