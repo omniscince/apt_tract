@@ -1,145 +1,171 @@
 {% extends 'base.html' %}
 {% block title %}{{ title }} - AutoPro{% endblock %}
 {% block page_title %}{{ title }}{% endblock %}
-{% block content %}
-<div class="card p-4">
-    <form method="post" id="invoice-form">
-        {% csrf_token %}
-        <div class="row g-3 mb-4">
+{% block desktop_page_title %}{{ title }}{% endblock %}
 
-            <!-- Customer autocomplete -->
-            <div class="col-md-12">
-                <label class="form-label fw-bold">Customer *</label>
-                <div class="position-relative">
-                    {{ form.customer_name }}
-                    <div id="customer-suggestions" class="list-group position-absolute w-100" style="z-index:1000;display:none;"></div>
+{% block back_link %}
+<a href="{% url 'invoice_list' %}" class="hdr-back"><i class="bi bi-chevron-left"></i> Back</a>
+{% endblock %}
+
+{% block content %}
+<div class="page-inner">
+<form method="post" id="invoice-form">
+    {% csrf_token %}
+
+    <!-- Customer -->
+    <p class="section-header" style="padding-left:0;">Customer</p>
+    <div class="ap-card" style="margin-bottom:14px;">
+        <div class="ap-card-body">
+            <div class="form-group" style="margin-bottom:0;position:relative;">
+                <label class="form-label">Customer Name *</label>
+                {{ form.customer_name }}
+                <div id="customer-suggestions"
+                     style="position:absolute;left:0;right:0;top:100%;z-index:1000;display:none;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.12);max-height:200px;overflow-y:auto;">
                 </div>
             </div>
+        </div>
+    </div>
 
-            <!-- VIN first -->
-            <div class="col-md-4">
-                <label class="form-label fw-bold">VIN <small class="text-muted">(min 8 chars)</small></label>
+    <!-- Vehicle -->
+    <p class="section-header" style="padding-left:0;">Vehicle</p>
+    <div class="ap-card" style="margin-bottom:14px;">
+        <div class="ap-card-body">
+            <div class="form-group">
+                <label class="form-label">VIN <span style="color:var(--muted);font-weight:400;text-transform:none;">(min 8 chars)</span></label>
                 {{ form.car_vin }}
-                <div id="vin-error" class="text-danger small mt-1" style="display:none;">VIN must be at least 8 characters</div>
+                <div id="vin-error" style="color:var(--danger);font-size:12px;margin-top:4px;display:none;">VIN must be at least 8 characters</div>
             </div>
-            <div class="col-md-4">
-                <label class="form-label fw-bold">Car Make *</label>
-                {{ form.car_make }}
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Make *</label>
+                    {{ form.car_make }}
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Model</label>
+                    {{ form.car_model }}
+                </div>
             </div>
-            <div class="col-md-4">
-                <label class="form-label">Car Model</label>
-                {{ form.car_model }}
-            </div>
-            <div class="col-md-4">
+            <div class="form-group" style="margin-top:12px;margin-bottom:0;">
                 <label class="form-label">Stock #</label>
                 {{ form.car_stock }}
             </div>
+        </div>
+    </div>
 
-            <!-- Dates -->
-            <div class="col-md-4">
-                <label class="form-label">Invoice Date *</label>
-                {{ form.invoice_date }}
+    <!-- Dates & Info -->
+    <p class="section-header" style="padding-left:0;">Invoice Details</p>
+    <div class="ap-card" style="margin-bottom:14px;">
+        <div class="ap-card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Invoice Date *</label>
+                    {{ form.invoice_date }}
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Due Date</label>
+                    {{ form.due_date }}
+                </div>
             </div>
-            <div class="col-md-4">
-                <label class="form-label">Due Date</label>
-                {{ form.due_date }}
-            </div>
-            <div class="col-md-4">
+            <div class="form-group" style="margin-top:12px;">
                 <label class="form-label">Last Edit Date</label>
                 {{ form.last_edit_date }}
             </div>
-
-            <!-- Other fields -->
-            <div class="col-md-6">
+            <div class="form-group">
                 <label class="form-label">PO Number</label>
                 {{ form.po_number }}
             </div>
-            <div class="col-md-6">
+            <div class="form-group">
                 <label class="form-label">Work Completed By</label>
                 {{ form.work_completed_by }}
             </div>
-            <div class="col-12">
-                <label class="form-label">Notes / Comments <small class="text-muted">(internal only, not shown in PDF)</small></label>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Notes <span style="color:var(--muted);font-weight:400;text-transform:none;">(internal only)</span></label>
                 {{ form.notes }}
             </div>
         </div>
+    </div>
 
-        <!-- Services -->
-        <h5 class="mb-3">Services</h5>
+    <!-- Services -->
+    <p class="section-header" style="padding-left:0;">Services</p>
+    <div class="ap-card" style="margin-bottom:14px;" id="services-card">
         {{ formset.management_form }}
         <div id="formset-container">
             {% for item_form in formset %}
-            <div class="row g-2 mb-2 formset-row">
-                <div class="col-md-8">
+            <div class="formset-row" style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:flex-start;">
+                <div style="flex:1;">
                     {{ item_form.description }}
                     {{ item_form.id }}
                 </div>
-                <div class="col-md-3">
+                <div style="width:90px;">
                     {{ item_form.price }}
                 </div>
-                <div class="col-md-1 d-flex align-items-center">
+                <div style="padding-top:10px;">
                     {% if item_form.DELETE %}
+                    <label style="display:flex;align-items:center;cursor:pointer;" title="Delete">
                         {{ item_form.DELETE }}
+                        <i class="bi bi-trash" style="color:var(--danger);font-size:16px;margin-left:4px;"></i>
+                    </label>
                     {% endif %}
                 </div>
             </div>
             {% endfor %}
         </div>
+        <div style="padding:12px 16px;">
+            <button type="button" id="add-row" class="ap-btn ap-btn-outline ap-btn-sm">
+                <i class="bi bi-plus"></i> Add Service
+            </button>
+        </div>
+    </div>
 
-        <button type="button" class="btn btn-outline-secondary btn-sm mb-4" id="add-row">
-            + Add Service
+    {% if form.errors or formset.errors %}
+    <div class="ap-alert ap-alert-danger" style="margin-bottom:14px;">
+        Please fix the errors below
+        {% for field, errors in form.errors.items %}
+        <div style="margin-top:4px;">{{ field }}: {{ errors }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div style="display:flex;gap:10px;margin-bottom:32px;">
+        <button type="submit" class="ap-btn ap-btn-primary" style="flex:1;justify-content:center;">
+            <i class="bi bi-check-lg"></i> Save Invoice
         </button>
+        <a href="{% url 'invoice_list' %}" class="ap-btn ap-btn-outline" style="flex:1;justify-content:center;">Cancel</a>
+    </div>
 
-        {% if form.errors or formset.errors %}
-        <div class="alert alert-danger">
-            Please fix the errors below
-            {% for field, errors in form.errors.items %}
-            <div>{{ field }}: {{ errors }}</div>
-            {% endfor %}
-        </div>
-        {% endif %}
-
-        <div class="d-flex gap-2">
-            <button type="submit" class="btn btn-primary" id="submit-btn">Save Invoice</button>
-            <a href="{% url 'invoice_list' %}" class="btn btn-outline-secondary">Cancel</a>
-        </div>
-    </form>
+</form>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-// Customer autocomplete
-const customerInput = document.getElementById('id_customer_name');
-const suggestions = document.getElementById('customer-suggestions');
+// ── Customer autocomplete ──
+var customerInput = document.getElementById('id_customer_name');
+var suggestions   = document.getElementById('customer-suggestions');
 
 customerInput.addEventListener('input', function() {
-    const q = this.value.trim();
-    if (q.length < 1) {
-        suggestions.style.display = 'none';
-        return;
-    }
-    fetch(`/api/customers/search/?q=${encodeURIComponent(q)}`)
-        .then(r => r.json())
-        .then(data => {
+    var q = this.value.trim();
+    if (q.length < 1) { suggestions.style.display = 'none'; return; }
+    fetch('/api/customers/search/?q=' + encodeURIComponent(q))
+        .then(function(r){ return r.json(); })
+        .then(function(data) {
             suggestions.innerHTML = '';
-            if (data.results.length === 0) {
-                suggestions.style.display = 'none';
-                return;
-            }
-            data.results.forEach(c => {
-                const item = document.createElement('button');
-                item.type = 'button';
-                item.className = 'list-group-item list-group-item-action';
-                item.innerHTML = `<strong>${c.name}</strong>${c.company ? ' — ' + c.company : ''} ${c.phone ? '<small class="text-muted">' + c.phone + '</small>' : ''}`;
+            if (!data.results.length) { suggestions.style.display='none'; return; }
+            data.results.forEach(function(c) {
+                var item = document.createElement('div');
+                item.style = 'padding:12px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:14px;';
+                item.innerHTML = '<strong>' + c.name + '</strong>' +
+                    (c.company ? ' <span style="color:var(--muted);">— ' + c.company + '</span>' : '') +
+                    (c.phone   ? ' <span style="color:var(--muted);font-size:12px;">' + c.phone + '</span>' : '');
+                item.addEventListener('mousedown', function(e){ e.preventDefault(); });
                 item.addEventListener('click', function() {
                     customerInput.value = c.name;
                     suggestions.style.display = 'none';
                     if (c.cars && c.cars.length > 0) {
-                        const car = c.cars[0];
-                        document.getElementById('id_car_make').value = car.make || '';
+                        var car = c.cars[0];
+                        document.getElementById('id_car_make').value  = car.make  || '';
                         document.getElementById('id_car_model').value = car.model || '';
-                        document.getElementById('id_car_vin').value = car.vin || '';
+                        document.getElementById('id_car_vin').value   = car.vin   || '';
                         document.getElementById('id_car_stock').value = car.stock || '';
                         validateVin();
                     }
@@ -149,59 +175,55 @@ customerInput.addEventListener('input', function() {
             suggestions.style.display = 'block';
         });
 });
-
 document.addEventListener('click', function(e) {
     if (!customerInput.contains(e.target) && !suggestions.contains(e.target)) {
         suggestions.style.display = 'none';
     }
 });
 
-// VIN validation
-const vinInput = document.getElementById('id_car_vin');
-const vinError = document.getElementById('vin-error');
-
+// ── VIN validation ──
+var vinInput = document.getElementById('id_car_vin');
+var vinError  = document.getElementById('vin-error');
 function validateVin() {
-    const vin = vinInput.value.trim();
-    if (vin.length > 0 && vin.length < 8) {
-        vinError.style.display = 'block';
-        return false;
-    } else {
-        vinError.style.display = 'none';
-        return true;
-    }
+    var vin = vinInput.value.trim();
+    if (vin.length > 0 && vin.length < 8) { vinError.style.display='block'; return false; }
+    vinError.style.display = 'none'; return true;
 }
-
 vinInput.addEventListener('input', validateVin);
-
-// Form submit validation
 document.getElementById('invoice-form').addEventListener('submit', function(e) {
-    if (!validateVin()) {
-        e.preventDefault();
-        vinInput.focus();
-    }
+    if (!validateVin()) { e.preventDefault(); vinInput.focus(); }
 });
 
-// Add service row
+// ── Add service row ──
 document.getElementById('add-row').addEventListener('click', function() {
-    const container = document.getElementById('formset-container');
-    const totalForms = document.getElementById('id_items-TOTAL_FORMS');
-    const formNum = parseInt(totalForms.value);
-    const newRow = document.createElement('div');
-    newRow.className = 'row g-2 mb-2 formset-row';
-    newRow.innerHTML = `
-        <div class="col-md-8">
-            <input type="text" name="items-${formNum}-description" class="form-control" placeholder="Service description">
-            <input type="hidden" name="items-${formNum}-id" value="">
-        </div>
-        <div class="col-md-3">
-            <input type="number" name="items-${formNum}-price" class="form-control" placeholder="0.00" step="0.01">
-        </div>
-        <div class="col-md-1">
-            <input type="checkbox" name="items-${formNum}-DELETE" style="margin-top: 10px;">
-        </div>
-    `;
+    var container  = document.getElementById('formset-container');
+    var totalForms = document.getElementById('id_items-TOTAL_FORMS');
+    var formNum    = parseInt(totalForms.value);
+    var newRow     = document.createElement('div');
+    newRow.className = 'formset-row';
+    newRow.style = 'padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:flex-start;';
+    newRow.innerHTML =
+        '<div style="flex:1;">' +
+            '<input type="text" name="items-' + formNum + '-description" class="form-control" placeholder="Service description">' +
+            '<input type="hidden" name="items-' + formNum + '-id" value="">' +
+        '</div>' +
+        '<div style="width:90px;">' +
+            '<input type="number" name="items-' + formNum + '-price" class="form-control" placeholder="0.00" step="0.01">' +
+        '</div>' +
+        '<div style="padding-top:10px;">' +
+            '<label style="display:flex;align-items:center;cursor:pointer;" title="Delete">' +
+                '<input type="checkbox" name="items-' + formNum + '-DELETE" style="display:none;">' +
+                '<i class="bi bi-trash" style="color:var(--danger);font-size:16px;" onclick="markDelete(this)"></i>' +
+            '</label>' +
+        '</div>';
     container.appendChild(newRow);
     totalForms.value = formNum + 1;
+    newRow.querySelector('input[type=text]').focus();
 });
+
+function markDelete(icon) {
+    var cb = icon.previousElementSibling;
+    if (cb) { cb.checked = !cb.checked; icon.style.opacity = cb.checked ? '0.3' : '1'; }
+}
 </script>
 {% endblock %}

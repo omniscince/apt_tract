@@ -118,21 +118,49 @@ class InvoiceListView(View):
         year = request.GET.get('year')
         vin = request.GET.get('vin')
         status = request.GET.get('status')
+        date_str = request.GET.get('date', '')  # single day YYYY-MM-DD for mobile nav
 
         if q:
-            invoices = invoices.filter(invoice_number__icontains=q)
+            invoices = invoices.filter(
+                invoice_number__icontains=q
+            ) | invoices.filter(customer__name__icontains=q)
         if customer_id:
             invoices = invoices.filter(customer_id=customer_id)
         if staff_id and user.role != 'staff':
             invoices = invoices.filter(created_by_id=staff_id)
-        if month:
-            invoices = invoices.filter(invoice_date__month=month)
-        if year:
-            invoices = invoices.filter(invoice_date__year=year)
+        if date_str:
+            # single-day filter takes priority over month/year
+            try:
+                from datetime import date as dt_date
+                parsed = dt_date.fromisoformat(date_str)
+                invoices = invoices.filter(invoice_date=parsed)
+            except ValueError:
+                date_str = ''
+        else:
+            if month:
+                invoices = invoices.filter(invoice_date__month=month)
+            if year:
+                invoices = invoices.filter(invoice_date__year=year)
         if vin:
             invoices = invoices.filter(car__vin__icontains=vin)
         if status:
             invoices = invoices.filter(status=status)
+
+        invoices = invoices.order_by('-invoice_date', '-created_at')
+
+        # Build human-readable date label for the mobile header
+        current_date_display = ''
+        if date_str:
+            try:
+                from datetime import date as dt_date
+                from django.utils.formats import date_format
+                parsed = dt_date.fromisoformat(date_str)
+                current_date_display = parsed.strftime('%a %b %d %Y')
+            except ValueError:
+                pass
+        if not current_date_display:
+            from django.utils import timezone
+            current_date_display = timezone.now().strftime('%a %b %d %Y')
 
         from users.models import User
         customers = Customer.objects.all()
@@ -141,6 +169,7 @@ class InvoiceListView(View):
             'invoices': invoices,
             'customers': customers,
             'staff_list': staff_list,
+            'current_date_display': current_date_display,
         })
 
 
@@ -339,7 +368,9 @@ class CustomerSearchView(View):
 @method_decorator(login_required, name='dispatch')
 class MonthlyReportView(View):
     def get(self, request):
-        invoices = Invoice.objects.all().select_related('customer', 'car', 'created_by')
+        from datetime import date, timedelta
+        from users.models import User
+        import decimal
 
         customer_id = request.GET.get('customer')
         staff_id = request.GET.get('staff')
@@ -349,32 +380,76 @@ class MonthlyReportView(View):
         date_to = request.GET.get('date_to')
         vin = request.GET.get('vin')
 
-        if customer_id:
-            invoices = invoices.filter(customer_id=customer_id)
+        # --- staff filter ---
+        staff_id = request.GET.get('staff', '')
         if staff_id:
             invoices = invoices.filter(created_by_id=staff_id)
-        if month:
-            invoices = invoices.filter(invoice_date__month=month)
-        if year and not date_from:
-            invoices = invoices.filter(invoice_date__year=year)
-        if date_from:
-            invoices = invoices.filter(invoice_date__gte=date_from)
-        if date_to:
-            invoices = invoices.filter(invoice_date__lte=date_to)
-        if vin:
-            invoices = invoices.filter(car__vin__icontains=vin)
 
-        from users.models import User
-        customers = Customer.objects.all()
+        # --- period filter (new mobile UI: today/week/month/custom) ---
+        period = request.GET.get('period', 'today')
+        today = date.today()
+        start_date = None
+        end_date = None
+
+        # also support legacy date_from / date_to / month / year
+        legacy_date_from = request.GET.get('date_from', '')
+        legacy_date_to   = request.GET.get('date_to', '')
+        start_param = request.GET.get('start', '')
+        end_param   = request.GET.get('end', '')
+
+        if period == 'today':
+            invoices = invoices.filter(invoice_date=today)
+        elif period == 'week':
+            week_start = today - timedelta(days=today.weekday())
+            invoices = invoices.filter(invoice_date__gte=week_start, invoice_date__lte=today)
+        elif period == 'month':
+            invoices = invoices.filter(invoice_date__year=today.year, invoice_date__month=today.month)
+        elif period == 'custom':
+            try:
+                start_date = date.fromisoformat(start_param) if start_param else None
+                end_date   = date.fromisoformat(end_param)   if end_param   else None
+            except ValueError:
+                start_date = end_date = None
+            if start_date:
+                invoices = invoices.filter(invoice_date__gte=start_date)
+            if end_date:
+                invoices = invoices.filter(invoice_date__lte=end_date)
+        else:
+            # legacy support
+            month_v = request.GET.get('month')
+            year_v  = request.GET.get('year', str(today.year))
+            if legacy_date_from:
+                invoices = invoices.filter(invoice_date__gte=legacy_date_from)
+            if legacy_date_to:
+                invoices = invoices.filter(invoice_date__lte=legacy_date_to)
+            if month_v:
+                invoices = invoices.filter(invoice_date__month=month_v)
+            if year_v and not legacy_date_from:
+                invoices = invoices.filter(invoice_date__year=year_v)
+
+        invoices = invoices.order_by('-invoice_date')
+        invoices_list = list(invoices)
+
+        subtotal = sum(inv.subtotal for inv in invoices_list)
+        hst_total = sum(inv.hst for inv in invoices_list)
+        total = sum(inv.total for inv in invoices_list)
+        count = len(invoices_list)
+        avg_value = (total / count).quantize(decimal.Decimal('0.01')) if count else decimal.Decimal('0.00')
+
         staff_list = User.objects.all()
 
         return render(request, 'invoices/monthly_report.html', {
-            'invoices': invoices,
-            'customers': customers,
+            'invoices': invoices_list,
             'staff_list': staff_list,
-            'total': sum(inv.total for inv in invoices),
-            'month': month,
-            'year': year,
+            'period': period,
+            'selected_staff_pk': staff_id,
+            'start_date': start_date,
+            'end_date': end_date,
+            'subtotal': subtotal,
+            'hst': hst_total if hst_total else None,
+            'total': total,
+            'invoice_count': count,
+            'avg_value': avg_value,
         })
 
 

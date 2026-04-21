@@ -1,19 +1,55 @@
 {% extends 'base.html' %}
 {% block title %}Customers - AutoPro{% endblock %}
 {% block page_title %}Customers{% endblock %}
+{% block desktop_page_title %}Customers{% endblock %}
+
+{% block back_link %}
+<a href="{% url 'dashboard' %}" class="hdr-back"><i class="bi bi-chevron-left"></i> Back</a>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h4>All Customers</h4>
-    {% if user.role in 'owner,staff,accountant' %}
-    <a href="{% url 'customer_create' %}" class="btn btn-primary">
-        <i class="bi bi-plus"></i> Add Customer
-    </a>
-    {% endif %}
+
+<!-- Search bar -->
+<div style="padding:10px 16px;background:#fff;border-bottom:1px solid var(--border);">
+    <form method="get" style="display:flex;gap:8px;">
+        <input type="text" name="q" class="form-control" placeholder="Search customers…" value="{{ request.GET.q }}" style="flex:1;">
+        <button type="submit" class="ap-btn ap-btn-primary ap-btn-sm"><i class="bi bi-search"></i></button>
+    </form>
 </div>
-<div class="card">
-    <div class="table-responsive">
-        <table class="table table-hover mb-0">
-            <thead class="table-light">
+
+<!-- Mobile list -->
+<div class="ap-card" style="border-radius:0;border-left:none;border-right:none;border-top:none;">
+    {% for c in customers %}
+    <a href="{% url 'customer_detail' c.pk %}" class="ap-list-item">
+        <div class="ap-list-icon">
+            <i class="bi bi-person-fill"></i>
+        </div>
+        <div class="ap-list-content">
+            <div class="ap-list-title">{{ c.name }}</div>
+            <div class="ap-list-sub">
+                {{ c.phone|default:"" }}{% if c.phone and c.city %} · {% endif %}{{ c.city|default:"" }}
+            </div>
+        </div>
+        <div class="ap-list-right" style="display:flex;align-items:center;gap:8px;">
+            {% if c.cars.count %}
+            <span style="font-size:12px;color:var(--muted);"><i class="bi bi-car-front"></i> {{ c.cars.count }}</span>
+            {% endif %}
+            <i class="bi bi-chevron-right" style="color:var(--muted);"></i>
+        </div>
+    </a>
+    {% empty %}
+    <div style="padding:48px 16px;text-align:center;color:var(--muted);">
+        <i class="bi bi-people" style="font-size:40px;display:block;margin-bottom:10px;"></i>
+        No customers yet
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Desktop table (hidden on mobile) -->
+<div class="desktop-only" style="padding:20px 0;display:none;">
+    <div class="ap-card">
+        <table class="ap-table">
+            <thead>
                 <tr><th>Name</th><th>Phone</th><th>Email</th><th>City</th><th>Cars</th><th></th></tr>
             </thead>
             <tbody>
@@ -25,21 +61,31 @@
                     <td>{{ c.city|default:'-' }}</td>
                     <td>{{ c.cars.count }}</td>
                     <td>
-                        <a href="{% url 'customer_detail' c.pk %}" class="btn btn-sm btn-outline-primary">
-                            <i class="bi bi-eye"></i>
-                        </a>
+                        <a href="{% url 'customer_detail' c.pk %}" class="ap-btn ap-btn-outline ap-btn-sm">View</a>
                         {% if user.role in 'owner,staff,accountant' %}
-                        <a href="{% url 'customer_edit' c.pk %}" class="btn btn-sm btn-outline-secondary">
-                            <i class="bi bi-pencil"></i>
-                        </a>
+                        <a href="{% url 'customer_edit' c.pk %}" class="ap-btn ap-btn-outline ap-btn-sm">Edit</a>
                         {% endif %}
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6" class="text-center text-muted py-4">No customers yet</td></tr>
+                <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px;">No customers</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+
+{% if user.role in 'owner,staff,accountant' %}
+<a href="{% url 'customer_create' %}" class="fab"><i class="bi bi-plus"></i></a>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+@media (min-width: 768px) {
+    .desktop-only { display: block !important; }
+    .ap-card[style*="border-radius:0"] { display: none; }
+}
+</style>
 {% endblock %}

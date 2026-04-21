@@ -1,30 +1,36 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}Login - AutoPro{% endblock %}
+
 {% block content %}
-<div class="row justify-content-center mt-5">
-    <div class="col-md-4">
-        <div class="card p-4">
-            <div class="text-center mb-4">
-                <h3>🚗 AutoPro</h3>
-                <p class="text-muted">CRM System</p>
-            </div>
-            <form method="post">
-                {% csrf_token %}
-                <div class="mb-3">
-                    <label class="form-label">Email</label>
-                    {{ form.email }}
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Password</label>
-                    {{ form.password }}
-                </div>
-                <button type="submit" class="btn btn-primary w-100">Login</button>
-            </form>
-            <hr>
-            <p class="text-center mb-0">
-                Don't have an account? <a href="{% url 'register' %}">Register</a>
-            </p>
+<div class="login-wrap">
+    <div class="login-card">
+        <div class="login-logo">
+            <img src="{% static 'images/logo_color.svg' %}" alt="AutoProtinting">
+            <p>Sign in to continue</p>
         </div>
+
+        {% for message in messages %}
+        <div class="ap-alert ap-alert-danger" style="margin-bottom:14px;">{{ message }}</div>
+        {% endfor %}
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label class="form-label">Email</label>
+                {{ form.email }}
+            </div>
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                {{ form.password }}
+            </div>
+            <button type="submit" class="ap-btn ap-btn-primary ap-btn-full" style="margin-top:8px;">
+                Sign In
+            </button>
+        </form>
+        <p style="text-align:center;font-size:13px;color:var(--muted);margin-top:20px;margin-bottom:0;">
+            Contact your administrator to get an account.
+        </p>
     </div>
 </div>
 {% endblock %}

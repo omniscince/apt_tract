@@ -1,6 +1,12 @@
 {% extends 'base.html' %}
 {% block title %}Cars - AutoPro{% endblock %}
 {% block page_title %}Cars{% endblock %}
+{% block desktop_page_title %}Cars{% endblock %}
+
+{% block back_link %}
+<a href="{% url 'dashboard' %}" class="hdr-back"><i class="bi bi-chevron-left"></i> Back</a>
+{% endblock %}
+
 {% block content %}
 
 <div class="card p-3 mb-4">
@@ -22,7 +28,33 @@
             <a href="{% url 'car_list' %}" class="btn btn-outline-secondary">Reset</a>
         </div>
     </form>
+
+<div style="padding:10px 16px;background:#fff;border-bottom:1px solid var(--border);">
+    <form method="get" style="display:flex;gap:8px;">
+        <input type="text" name="q" class="form-control" placeholder="Search VIN, make, model…" value="{{ request.GET.q }}" style="flex:1;">
+        <button type="submit" class="ap-btn ap-btn-primary ap-btn-sm"><i class="bi bi-search"></i></button>
+    </form>
 </div>
+
+<div class="ap-card" style="border-radius:0;border-left:none;border-right:none;border-top:none;">
+    {% for car in cars %}
+    <div class="ap-list-item">
+        <div class="ap-list-icon"><i class="bi bi-car-front-fill"></i></div>
+        <div class="ap-list-content">
+            <div class="ap-list-title">{{ car.make }} {{ car.model }}{% if car.year %} ({{ car.year }}){% endif %}</div>
+            <div class="ap-list-sub">
+                {% if car.vin %}VIN: {{ car.vin }}{% endif %}
+                {% if car.customer %} · {{ car.customer.name }}{% endif %}
+            </div>
+        </div>
+        {% if user.role in 'owner,staff' %}
+        <a href="{% url 'car_edit' car.pk %}" class="ap-btn ap-btn-outline ap-btn-sm">Edit</a>
+        {% endif %}
+    </div>
+    {% empty %}
+    <div style="padding:48px 16px;text-align:center;color:var(--muted);">
+        <i class="bi bi-car-front" style="font-size:40px;display:block;margin-bottom:10px;"></i>
+        No cars yet
 
 <div class="card">
     <div class="table-responsive">
@@ -69,5 +101,10 @@
             </tbody>
         </table>
     </div>
+    {% endfor %}
 </div>
+
+{% if user.role in 'owner,staff' %}
+<a href="{% url 'car_create' %}" class="fab"><i class="bi bi-plus"></i></a>
+{% endif %}
 {% endblock %}

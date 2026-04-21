@@ -1,81 +1,332 @@
 {% extends 'base.html' %}
-{% block title %}Monthly Report - AutoPro{% endblock %}
-{% block page_title %}Monthly Report{% endblock %}
+{% block title %}Revenue Report - AutoPro{% endblock %}
+{% block page_title %}Revenue Report{% endblock %}
+{% block desktop_page_title %}Revenue Report{% endblock %}
+
+{% block back_link %}
+<a href="{% url 'dashboard' %}" class="hdr-back"><i class="bi bi-chevron-left"></i> Back</a>
+{% endblock %}
+
 {% block content %}
-<div class="card p-4 mb-4">
-    <form method="get" class="row g-3 align-items-end">
-        <div class="col-md-4">
-            <label class="form-label">Customer</label>
-            <select name="customer" class="form-control" required>
-                <option value="">Select Customer</option>
-                {% for c in customers %}
-                <option value="{{ c.pk }}" {% if selected_customer and selected_customer.pk == c.pk %}selected{% endif %}>{{ c.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-2">
-            <label class="form-label">Month</label>
-            <input type="number" name="month" class="form-control" value="{{ month }}" min="1" max="12">
-        </div>
-        <div class="col-md-2">
-            <label class="form-label">Year</label>
-            <input type="number" name="year" class="form-control" value="{{ year }}">
-        </div>
-        <div class="col-md-2">
-            <button type="submit" class="btn btn-primary w-100">Generate</button>
-        </div>
-        {% if selected_customer and invoices %}
-        <div class="col-md-2">
-            <a href="{% url 'monthly_report_pdf' %}?customer={{ selected_customer.pk }}&month={{ month }}&year={{ year }}"
-               class="btn btn-success w-100">
-                <i class="bi bi-file-pdf"></i> PDF
-            </a>
-        </div>
-        {% endif %}
-    </form>
+
+<!-- Crew selector row -->
+<div class="crew-row">
+    <span class="crew-label">Crew</span>
+    <div class="crew-select-wrap">
+        <select class="crew-select" id="crew-select" onchange="applyFilters()">
+            <option value="">All</option>
+            {% for s in staff_list %}
+            <option value="{{ s.pk }}" {% if selected_staff_pk == s.pk|stringformat:"s" %}selected{% endif %}>
+                {{ s.get_full_name|upper }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
 </div>
 
-{% if selected_customer %}
-<h5>{{ selected_customer.name }} — Month {{ month }}/{{ year }}</h5>
-<div class="card">
-    <div class="table-responsive">
-        <table class="table table-hover mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>Invoice #</th>
-                    <th>Date</th>
-                    <th>Car</th>
-                    <th>Services</th>
-                    <th class="text-end">Total</th>
-                </tr>
+<!-- Period segment control -->
+<div style="padding:12px 16px;background:#fff;border-bottom:1px solid var(--border);">
+    <div class="seg-control" id="seg">
+        <button onclick="setPeriod('today')"      class="{% if period == 'today' or not period %}active{% endif %}">Today</button>
+        <button onclick="setPeriod('week')"       class="{% if period == 'week' %}active{% endif %}">This Week</button>
+        <button onclick="setPeriod('month')"      class="{% if period == 'month' %}active{% endif %}">This Month</button>
+        <button onclick="setPeriod('custom')"     class="{% if period == 'custom' %}active{% endif %}">Custom</button>
+    </div>
+</div>
+
+<!-- Custom date range (shown when period=custom) -->
+<div id="custom-dates" style="{% if period != 'custom' %}display:none;{% endif %}padding:12px 16px;background:#fff;border-bottom:1px solid var(--border);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <span style="font-size:13px;color:var(--muted);font-weight:600;">Start Date</span>
+        <span style="font-size:14px;font-weight:600;color:var(--brand);cursor:pointer;" id="start-date-display"
+              onclick="openCalendar('start')">{{ start_date|date:"m/d/Y"|default:"Select" }}</span>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:13px;color:var(--muted);font-weight:600;">End Date</span>
+        <span style="font-size:14px;font-weight:600;color:var(--brand);cursor:pointer;" id="end-date-display"
+              onclick="openCalendar('end')">{{ end_date|date:"m/d/Y"|default:"Select" }}</span>
+    </div>
+    <input type="hidden" id="start-date-val" value="{{ start_date|date:'Y-m-d' }}">
+    <input type="hidden" id="end-date-val"   value="{{ end_date|date:'Y-m-d' }}">
+</div>
+
+<!-- Summary -->
+<div style="background:#fff;padding:28px 16px 16px;text-align:center;border-bottom:1px solid var(--border);">
+    <div style="font-size:14px;color:var(--muted);margin-bottom:4px;">Sub Total:</div>
+    <div style="font-size:36px;font-weight:700;color:var(--text);line-height:1;">${{ subtotal|default:"0.00" }}</div>
+
+    {% if hst %}
+    <div style="font-size:14px;color:var(--muted);margin-top:14px;margin-bottom:2px;">HST:</div>
+    <div style="font-size:28px;font-weight:700;color:var(--text);">${{ hst }}</div>
+    {% endif %}
+
+    <div style="font-size:18px;font-weight:700;color:var(--text);margin-top:18px;">Total:</div>
+</div>
+
+<!-- Stats -->
+<div style="background:#fff;padding:8px 0;">
+    <div style="display:flex;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);">
+        <span style="font-size:14px;color:var(--muted);">No. of Invoices Created:</span>
+        <span style="font-size:14px;font-weight:700;">{{ invoice_count|default:"0" }}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);">
+        <span style="font-size:14px;color:var(--muted);">Average Invoice Value:</span>
+        <span style="font-size:14px;font-weight:700;">${{ avg_value|default:"0.00" }}</span>
+    </div>
+    <div style="padding:12px 16px;">
+        <span style="font-size:12px;color:var(--muted);font-style:italic;">Note: Only Finalized invoices count towards revenue</span>
+    </div>
+</div>
+
+<!-- Desktop: full table -->
+<div class="desktop-only" style="padding:20px 28px;display:none;">
+    {% if invoices %}
+    <div class="ap-card">
+        <table class="ap-table">
+            <thead>
+                <tr><th>Invoice #</th><th>Date</th><th>Car</th><th>Services</th><th style="text-align:right;">Total</th></tr>
             </thead>
             <tbody>
                 {% for inv in invoices %}
                 <tr>
-                    <td><a href="{% url 'invoice_detail' inv.pk %}">{{ inv.invoice_number }}</a></td>
+                    <td><a href="{% url 'invoice_detail' inv.pk %}" style="color:var(--brand);font-weight:600;">{{ inv.invoice_number }}</a></td>
                     <td>{{ inv.invoice_date|date:"m/d/Y" }}</td>
                     <td>{{ inv.car.make }} {{ inv.car.model }}</td>
-                    <td>
-                        {% for item in inv.items.all %}
-                        <small class="d-block">{{ item.description }} — ${{ item.price }}</small>
-                        {% endfor %}
-                    </td>
-                    <td class="text-end"><strong>${{ inv.total }}</strong></td>
+                    <td>{% for item in inv.items.all %}<small style="display:block;">{{ item.description }} — ${{ item.price }}</small>{% endfor %}</td>
+                    <td style="text-align:right;font-weight:700;">${{ inv.total }}</td>
                 </tr>
-                {% empty %}
-                <tr><td colspan="5" class="text-center text-muted py-4">No invoices for this period</td></tr>
                 {% endfor %}
             </tbody>
-            {% if invoices %}
-            <tfoot class="table-dark">
-                <tr>
-                    <td colspan="4" class="text-end"><strong>Total Due:</strong></td>
-                    <td class="text-end"><strong>${{ total }}</strong></td>
+            <tfoot>
+                <tr style="background:#f7f8fc;">
+                    <td colspan="4" style="text-align:right;font-weight:700;padding:12px 14px;">Total Due:</td>
+                    <td style="text-align:right;font-weight:700;padding:12px 14px;">${{ subtotal }}</td>
                 </tr>
             </tfoot>
-            {% endif %}
         </table>
     </div>
+    {% if selected_customer and invoices %}
+    <div style="margin-top:12px;">
+        <a href="{% url 'monthly_report_pdf' %}?customer={{ selected_customer.pk }}&month={{ month }}&year={{ year }}"
+           class="ap-btn ap-btn-success"><i class="bi bi-file-pdf"></i> Download PDF</a>
+    </div>
+    {% endif %}
+    {% endif %}
 </div>
-{% endif %}
+
+<!-- DRUM PICKER OVERLAY (crew) -->
+<div class="ap-overlay" id="drum-overlay" onclick="closeDrum()"></div>
+<div class="ap-sheet" id="drum-sheet">
+    <span class="ap-sheet-handle"></span>
+    <div class="ap-sheet-title">Select Crew Member</div>
+    <div class="drum-wrap" id="drum-wrap">
+        <div class="drum-shade-top"></div>
+        <div class="drum-shade-bot"></div>
+        <div class="drum-line-top"></div>
+        <div class="drum-line-bot"></div>
+        <ul class="drum-list" id="drum-list"></ul>
+    </div>
+    <div class="ap-sheet-actions" style="margin-top:12px;">
+        <button onclick="confirmDrum()" class="ap-btn ap-btn-primary" style="flex:1;">Select</button>
+        <button onclick="closeDrum()" class="ap-btn ap-btn-outline" style="flex:1;">Close</button>
+    </div>
+</div>
+
+<!-- CALENDAR OVERLAY -->
+<div class="ap-overlay" id="cal-overlay" onclick="closeCalendar()"></div>
+<div class="ap-sheet" id="cal-sheet">
+    <span class="ap-sheet-handle"></span>
+    <div id="cal-title" class="ap-sheet-title">Select Date</div>
+    <div id="cal-header" style="display:flex;align-items:center;gap:8px;padding:0 4px 12px;">
+        <button class="date-nav-btn" onclick="calPrevMonth()"><i class="bi bi-chevron-left"></i></button>
+        <select id="cal-month-sel" class="form-control" style="flex:1;" onchange="renderCal()">
+            <option value="0">January</option><option value="1">February</option>
+            <option value="2">March</option><option value="3">April</option>
+            <option value="4">May</option><option value="5">June</option>
+            <option value="6">July</option><option value="7">August</option>
+            <option value="8">September</option><option value="9">October</option>
+            <option value="10">November</option><option value="11">December</option>
+        </select>
+        <select id="cal-year-sel" class="form-control" style="width:90px;" onchange="renderCal()"></select>
+        <button class="date-nav-btn" onclick="calNextMonth()"><i class="bi bi-chevron-right"></i></button>
+    </div>
+    <div id="cal-grid" class="cal-grid" style="padding:0 4px 4px;"></div>
+    <div style="display:flex;gap:8px;padding:12px 0 0;">
+        <button onclick="confirmCal()" class="ap-btn ap-btn-primary" style="flex:1;">Set</button>
+        <button onclick="closeCalendar()" class="ap-btn ap-btn-outline" style="flex:1;">Close</button>
+    </div>
+</div>
+
+<!-- Hidden form for submitting filters -->
+<form method="get" id="filter-form" style="display:none;">
+    <input type="hidden" name="period" id="hf-period" value="{{ period|default:'today' }}">
+    <input type="hidden" name="staff"  id="hf-staff"  value="{{ selected_staff_pk|default:'' }}">
+    <input type="hidden" name="start"  id="hf-start"  value="{{ start_date|date:'Y-m-d' }}">
+    <input type="hidden" name="end"    id="hf-end"    value="{{ end_date|date:'Y-m-d' }}">
+</form>
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+@media (min-width: 768px) {
+    .crew-row, .desktop-only { display: flex !important; }
+    .desktop-only { display: block !important; }
+}
+</style>
+<script>
+var currentPeriod = '{{ period|default:"today" }}';
+var calTarget = 'start'; // 'start' or 'end'
+var calYear, calMonth, calSelected;
+
+var crewOptions = [
+    {val:'', label:'None'},
+    {% for s in staff_list %}{val:'{{ s.pk }}', label:'{{ s.get_full_name|upper }}'},{% endfor %}
+];
+var drumIndex = 0;
+
+function setPeriod(p) {
+    currentPeriod = p;
+    document.querySelectorAll('#seg button').forEach(function(b,i){ b.classList.remove('active'); });
+    document.querySelectorAll('#seg button')[['today','week','month','custom'].indexOf(p)].classList.add('active');
+    document.getElementById('custom-dates').style.display = (p === 'custom') ? '' : 'none';
+    if (p !== 'custom') applyFilters();
+}
+
+function applyFilters() {
+    var f = document.getElementById('filter-form');
+    document.getElementById('hf-period').value = currentPeriod;
+    document.getElementById('hf-staff').value  = document.getElementById('crew-select').value;
+    document.getElementById('hf-start').value  = document.getElementById('start-date-val').value;
+    document.getElementById('hf-end').value    = document.getElementById('end-date-val').value;
+    f.submit();
+}
+
+/* ── DRUM PICKER ── */
+function buildDrum() {
+    var list = document.getElementById('drum-list');
+    list.innerHTML = '';
+    // padding items
+    for (var p=0;p<2;p++) { var li=document.createElement('li'); li.className='drum-item'; li.style.height='40px'; list.appendChild(li); }
+    crewOptions.forEach(function(opt, i) {
+        var li = document.createElement('li');
+        li.className = 'drum-item' + (i===drumIndex?' center':'');
+        li.textContent = opt.label;
+        li.dataset.val = opt.val;
+        li.dataset.idx = i;
+        li.onclick = function(){ setDrumIndex(parseInt(this.dataset.idx)); };
+        list.appendChild(li);
+    });
+    for (var p=0;p<2;p++) { var li=document.createElement('li'); li.className='drum-item'; li.style.height='40px'; list.appendChild(li); }
+    scrollDrum();
+}
+
+function setDrumIndex(i) {
+    drumIndex = Math.max(0, Math.min(i, crewOptions.length-1));
+    var items = document.querySelectorAll('#drum-list .drum-item[data-idx]');
+    items.forEach(function(el){ el.classList.toggle('center', parseInt(el.dataset.idx)===drumIndex); });
+    scrollDrum();
+}
+
+function scrollDrum() {
+    var list = document.getElementById('drum-list');
+    list.style.transform = 'translateY(' + (-drumIndex * 40) + 'px)';
+}
+
+function confirmDrum() {
+    var sel = crewOptions[drumIndex];
+    document.getElementById('crew-select').value = sel.val;
+    closeDrum();
+    applyFilters();
+}
+function closeDrum() { closeSheet('drum'); }
+
+// init drum index from current selection
+var curStaff = '{{ selected_staff_pk|default:"" }}';
+for (var di=0;di<crewOptions.length;di++) { if (crewOptions[di].val===curStaff) { drumIndex=di; break; } }
+
+document.getElementById('crew-select').addEventListener('click', function(e) {
+    if (window.innerWidth < 768) {
+        e.preventDefault(); buildDrum(); openSheet('drum');
+    }
+});
+
+/* ── CALENDAR ── */
+var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+var DAY_HDRS = ['M','T','W','T','F','S','S'];
+
+function openCalendar(target) {
+    calTarget = target;
+    var valEl = document.getElementById(target+'-date-val');
+    var d = valEl.value ? new Date(valEl.value+'T00:00:00') : new Date();
+    calYear = d.getFullYear(); calMonth = d.getMonth();
+    calSelected = valEl.value || null;
+    document.getElementById('cal-title').textContent = target==='start' ? 'Select Start Date' : 'Select End Date';
+    // populate year sel
+    var ySel = document.getElementById('cal-year-sel');
+    ySel.innerHTML = '';
+    for (var y=2020;y<=2030;y++) {
+        var opt = document.createElement('option');
+        opt.value=y; opt.textContent=y;
+        if (y===calYear) opt.selected=true;
+        ySel.appendChild(opt);
+    }
+    document.getElementById('cal-month-sel').value = calMonth;
+    renderCal();
+    openSheet('cal');
+}
+
+function closeCalendar() { closeSheet('cal'); }
+
+function renderCal() {
+    calMonth = parseInt(document.getElementById('cal-month-sel').value);
+    calYear  = parseInt(document.getElementById('cal-year-sel').value);
+    var grid = document.getElementById('cal-grid');
+    grid.innerHTML = '';
+    DAY_HDRS.forEach(function(h) {
+        var el=document.createElement('div'); el.className='cal-day-header'; el.textContent=h; grid.appendChild(el);
+    });
+    var firstDay = new Date(calYear, calMonth, 1).getDay();
+    firstDay = (firstDay+6)%7; // Mon=0
+    for (var b=0;b<firstDay;b++) { var el=document.createElement('div'); el.className='cal-day empty'; grid.appendChild(el); }
+    var days = new Date(calYear, calMonth+1, 0).getDate();
+    var todayStr = new Date().toISOString().split('T')[0];
+    for (var d=1;d<=days;d++) {
+        var ds = calYear+'-'+String(calMonth+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+        var el = document.createElement('div');
+        el.className = 'cal-day';
+        if (ds===todayStr) el.classList.add('today');
+        if (ds===calSelected) el.classList.add('selected');
+        el.textContent = d;
+        el.dataset.date = ds;
+        el.onclick = function(){ calSelected=this.dataset.date; renderCal(); };
+        grid.appendChild(el);
+    }
+}
+
+function calPrevMonth() { calMonth--; if(calMonth<0){calMonth=11;calYear--;} document.getElementById('cal-month-sel').value=calMonth; document.getElementById('cal-year-sel').value=calYear; renderCal(); }
+function calNextMonth() { calMonth++; if(calMonth>11){calMonth=0;calYear++;} document.getElementById('cal-month-sel').value=calMonth; document.getElementById('cal-year-sel').value=calYear; renderCal(); }
+
+function confirmCal() {
+    if (!calSelected) { closeCalendar(); return; }
+    var parts = calSelected.split('-');
+    var display = parts[1]+'/'+parts[2]+'/'+parts[0];
+    document.getElementById(calTarget+'-date-val').value = calSelected;
+    document.getElementById(calTarget+'-date-display').textContent = display;
+    closeCalendar();
+    if (document.getElementById('start-date-val').value && document.getElementById('end-date-val').value) {
+        applyFilters();
+    }
+}
+
+/* ── Sheet helpers ── */
+function openSheet(name) {
+    document.getElementById(name+'-overlay').classList.add('open');
+    document.getElementById(name+'-sheet').classList.add('open');
+}
+function closeSheet(name) {
+    document.getElementById(name+'-overlay').classList.remove('open');
+    document.getElementById(name+'-sheet').classList.remove('open');
+}
+</script>
 {% endblock %}

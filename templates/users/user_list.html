@@ -1,57 +1,33 @@
 {% extends 'base.html' %}
 {% block title %}Users - AutoPro{% endblock %}
-{% block page_title %}Users Management{% endblock %}
+{% block page_title %}Settings{% endblock %}
+{% block desktop_page_title %}Users / Settings{% endblock %}
+
+{% block back_link %}
+<a href="{% url 'dashboard' %}" class="hdr-back"><i class="bi bi-chevron-left"></i> Back</a>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h4>All Users</h4>
-    <a href="{% url 'user_create' %}" class="btn btn-primary">
-        <i class="bi bi-plus"></i> Add User
+<p class="section-header">Team Members</p>
+<div class="ap-card" style="border-radius:0;border-left:none;border-right:none;">
+    {% for u in users %}
+    <a href="{% url 'user_edit' u.pk %}" class="ap-list-item">
+        <div class="ap-list-icon">
+            <i class="bi bi-person-fill"></i>
+        </div>
+        <div class="ap-list-content">
+            <div class="ap-list-title">{{ u.get_full_name|default:u.email }}</div>
+            <div class="ap-list-sub">{{ u.email }}</div>
+        </div>
+        <div class="ap-list-right" style="display:flex;align-items:center;gap:8px;">
+            <span class="ap-badge badge-{{ u.role }}">{{ u.role|upper }}</span>
+            <i class="bi bi-chevron-right" style="color:var(--muted);"></i>
+        </div>
     </a>
+    {% empty %}
+    <div style="padding:32px;text-align:center;color:var(--muted);">No users</div>
+    {% endfor %}
 </div>
-<div class="card">
-    <div class="table-responsive">
-        <table class="table table-hover mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>Email</th>
-                    <th>Name</th>
-                    <th>Role</th>
-                    <th>Phone</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for u in users %}
-                <tr>
-                    <td>{{ u.email }}</td>
-                    <td>{{ u.get_full_name }}</td>
-                    <td><span class="badge badge-{{ u.role }}">{{ u.role|upper }}</span></td>
-                    <td>{{ u.phone|default:'-' }}</td>
-                    <td>
-                        {% if u.is_active %}
-                        <span class="badge bg-success">Active</span>
-                        {% else %}
-                        <span class="badge bg-danger">Inactive</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if u != request.user %}
-                        <form method="post" action="{% url 'user_delete' u.pk %}" class="d-inline"
-                              onsubmit="return confirm('Delete this user?')">
-                            {% csrf_token %}
-                            <button class="btn btn-sm btn-outline-danger">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </form>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="6" class="text-center text-muted py-4">No users found</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
+
+<a href="{% url 'user_create' %}" class="fab"><i class="bi bi-plus"></i></a>
 {% endblock %}
