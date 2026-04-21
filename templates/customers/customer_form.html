@@ -7,42 +7,88 @@
         {% csrf_token %}
         <div class="row g-3">
             <div class="col-md-6">
-                <label class="form-label">Company/Customer Name *</label>
+                <label class="form-label fw-bold">Customer Name *</label>
                 {{ form.name }}
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Business Number (BN)</label>
+                {{ form.business_number }}
             </div>
             <div class="col-md-6">
                 <label class="form-label">Phone</label>
                 {{ form.phone }}
             </div>
             <div class="col-md-6">
-                <label class="form-label">Email</label>
-                {{ form.email }}
-            </div>
-            <div class="col-md-6">
                 <label class="form-label">Address</label>
                 {{ form.address }}
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label class="form-label">City</label>
                 {{ form.city }}
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label class="form-label">Province</label>
                 {{ form.province }}
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label class="form-label">Postal Code</label>
                 {{ form.postal_code }}
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label class="form-label">Country</label>
                 {{ form.country }}
             </div>
         </div>
+        <h5 class="mt-4 mb-3">Email Addresses</h5>
+        {{ email_formset.management_form }}
+        <div id="email-formset">
+            {% for ef in email_formset %}
+            <div class="row g-2 mb-2 align-items-center email-row">
+                {{ ef.id }}
+                <div class="col-md-7">{{ ef.email }}</div>
+                <div class="col-md-2 d-flex align-items-center gap-2">
+                    <input type="checkbox" name="{{ ef.is_primary.html_name }}" id="{{ ef.is_primary.id_for_label }}" class="form-check-input" {% if ef.is_primary.value %}checked{% endif %}>
+                    <label class="mb-0">Primary</label>
+                </div>
+                <div class="col-md-3">
+                    {% if ef.instance.pk %}
+                    <div class="d-flex align-items-center gap-2">
+                        {{ ef.DELETE }}
+                        <label class="mb-0 text-danger small">Remove</label>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <button type="button" class="btn btn-outline-secondary btn-sm mt-2" id="add-email">+ Add Email</button>
         <div class="d-flex gap-2 mt-4">
             <button type="submit" class="btn btn-primary">Save</button>
             <a href="{% url 'customer_list' %}" class="btn btn-outline-secondary">Cancel</a>
         </div>
     </form>
 </div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('add-email').addEventListener('click', function() {
+    const container = document.getElementById('email-formset');
+    const total = document.getElementById('id_emails-TOTAL_FORMS');
+    const num = parseInt(total.value);
+    const row = document.createElement('div');
+    row.className = 'row g-2 mb-2 align-items-center email-row';
+    row.innerHTML = `
+        <input type="hidden" name="emails-${num}-id" value="">
+        <div class="col-md-7">
+            <input type="email" name="emails-${num}-email" class="form-control" placeholder="Email address">
+        </div>
+        <div class="col-md-2 d-flex align-items-center gap-2">
+            <input type="checkbox" name="emails-${num}-is_primary">
+            <label class="mb-0">Primary</label>
+        </div>
+    `;
+    container.appendChild(row);
+    total.value = num + 1;
+});
+</script>
 {% endblock %}

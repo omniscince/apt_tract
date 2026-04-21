@@ -114,10 +114,10 @@
         <div class="col-md-6 text-end">
             <h4 class="fw-bold">Invoice #{{ invoice.invoice_number }}</h4>
             <p class="mb-0">
-                Invoice Date: {{ invoice.invoice_date|date:"m/d/Y" }}<br>
-                {% if invoice.due_date %}Payment Due: {{ invoice.due_date|date:"m/d/Y" }}<br>{% endif %}
+                Invoice Date: {{ invoice.invoice_date|date:"N j, Y" }}<br>
+                {% if invoice.due_date %}Payment Due: {{ invoice.due_date|date:"N j, Y" }}<br>{% endif %}
                 {% if invoice.po_number %}PO Number: {{ invoice.po_number }}<br>{% endif %}
-                {% if invoice.last_edit_date %}Last Edit: {{ invoice.last_edit_date|date:"m/d/Y" }}{% endif %}
+                {% if invoice.last_edit_date %}Last Edit: {{ invoice.last_edit_date|date:"N j, Y" }}{% endif %}
             </p>
         </div>
     </div>

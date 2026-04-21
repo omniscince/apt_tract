@@ -50,7 +50,7 @@
                     <td>{{ car.vin|default:'-' }}</td>
                     <td>
                         {% with last=car.get_last_invoice_date %}
-                        {% if last %}{{ last|date:"m/d/Y" }}{% else %}-{% endif %}
+                        {% if last %}{{ last|date:"N j, Y" }}{% else %}-{% endif %}
                         {% endwith %}
                     </td>
                     <td class="d-flex gap-1">

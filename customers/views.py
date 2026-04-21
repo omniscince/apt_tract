@@ -110,6 +110,10 @@ class CustomerDeleteView(View):
             messages.error(request, 'Access denied')
             return redirect('customer_list')
         customer = get_object_or_404(Customer, pk=pk)
+        if customer.invoices.exists():
+            messages.error(request, f'Cannot delete "{customer.name}" — this customer has existing invoices. Please remove the invoices first.')
+            return redirect('customer_detail', pk=pk)
+        name = customer.name
         customer.delete()
-        messages.success(request, 'Customer deleted')
+        messages.success(request, f'Customer {name} deleted successfully.')
         return redirect('customer_list')
