@@ -273,15 +273,13 @@ class InvoiceActionView(View):
                 subject=f'Your Invoice from AutoProTinting — #{invoice.invoice_number}',
                 body=(
                     f'Dear {customer_name},\n\n'
-                    f'Please find your invoice attached.\n\n'
-                    f'We kindly ask you to complete the payment according to our agreement '
-                    f'at your earliest convenience.\n\n'
-                    f'If you have any questions or need any clarification, feel free to reach out '
-                    f'— we\'re always happy to help.\n\n'
-                    f'Thank you for choosing AutoProTinting. We truly appreciate your business '
-                    f'and look forward to working with you again.\n\n'
-                    f'Best regards,\n'
-                    f'AutoProTinting Team'
+                    f'Here\'s your invoice! We appreciate your prompt payment. Thanks for your business!\n\n'
+                    f'To view and print the attached invoice, double-click on the invoice icon, '
+                    f'and then choose File, Print when the invoice is displayed. '
+                    f'To save the invoice, copy it from this e-mail to another folder on your computer.\n\n'
+                    f'If you have any questions regarding this invoice, please contact Accounting at (647) 771-1112\n\n'
+                    f'Regards,\n'
+                    f'Accounting Department, Autoprotinting'
                 ),
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 to=emails,
@@ -329,8 +327,8 @@ class InvoicePDFView(View):
 class InvoiceDeleteView(View):
     def post(self, request, pk):
         invoice = get_object_or_404(Invoice, pk=pk)
-        if request.user.role == 'staff' and invoice.created_by != request.user and invoice.work_completed_by != request.user:
-            messages.error(request, 'Access denied')
+        if request.user.role == 'staff':
+            messages.error(request, 'Access denied — staff cannot delete invoices')
             return redirect('invoice_list')
         invoice.delete()
         messages.success(request, 'Invoice deleted')

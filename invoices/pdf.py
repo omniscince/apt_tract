@@ -8,7 +8,7 @@ import os
 from django.conf import settings as django_settings
 from decimal import Decimal
 
-COMPANY_NAME = "Autoprotinting"
+COMPANY_NAME = "Autoprotinting INC."
 COMPANY_ADDRESS = "44 Edwin Pearson Street"
 COMPANY_CITY = "Aurora, ON, L4G 0S1"
 COMPANY_COUNTRY = "Canada"
@@ -37,6 +37,7 @@ def generate_invoice_pdf(response, invoice):
     story = []
 
     bold_style = ParagraphStyle('Bold', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10)
+    company_style = ParagraphStyle('CompanyName', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=15, spaceAfter=0, spaceBefore=0, leading=18)
     normal_style = ParagraphStyle('Normal2', parent=styles['Normal'], fontSize=9)
     small_style = ParagraphStyle('Small', parent=styles['Normal'], fontSize=8)
     title_style = ParagraphStyle('Title2', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=16, alignment=TA_CENTER)
@@ -55,7 +56,7 @@ def generate_invoice_pdf(response, invoice):
     # Header: company info left, logo + invoice info right
     header_data = [
         [
-            Paragraph(f"<b>{COMPANY_NAME}</b>", ParagraphStyle('CompanyName', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=13)),
+            Paragraph(f"<b>{COMPANY_NAME}</b>", company_style),
             logo_cell,
         ],
         [
@@ -87,7 +88,8 @@ def generate_invoice_pdf(response, invoice):
     header_table = Table(header_data, colWidths=[4*inch, 3.5*inch])
     header_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 1),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 3),
         ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
     ]))
     story.append(header_table)
@@ -241,6 +243,7 @@ def generate_monthly_report_pdf(response, invoices):
     story = []
 
     bold_style = ParagraphStyle('Bold', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10)
+    company_style = ParagraphStyle('CompanyName', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=15, spaceAfter=0, spaceBefore=0, leading=18)
     normal_style = ParagraphStyle('Normal2', parent=styles['Normal'], fontSize=9)
     title_style = ParagraphStyle('Title2', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=14, alignment=TA_CENTER)
     right_style = ParagraphStyle('Right', parent=styles['Normal'], fontSize=9, alignment=TA_RIGHT)

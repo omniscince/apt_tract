@@ -7,4 +7,5 @@ urlpatterns = [
     path('cars/<int:pk>/', views.CarDetailView.as_view(), name='car_detail'),
     path('cars/<int:pk>/edit/', views.CarEditView.as_view(), name='car_edit'),
     path('cars/<int:pk>/delete/', views.CarDeleteView.as_view(), name='car_delete'),
+    path('cars/search/vin/', views.VINSearchView.as_view(), name='vin_search'),
 ]

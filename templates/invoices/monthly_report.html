@@ -1,5 +1,41 @@
 {% extends 'base.html' %}
 {% block title %}Report - AutoPro{% endblock %}
+
+{% block scripts %}
+<script>
+const vinInput = document.getElementById('vin-search-report');
+const vinSuggestions = document.getElementById('vin-suggestions-report');
+
+vinInput.addEventListener('input', function() {
+    const q = this.value.trim();
+    if (q.length < 2) { vinSuggestions.style.display = 'none'; return; }
+    fetch(`/cars/search/vin/?q=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(data => {
+            vinSuggestions.innerHTML = '';
+            if (!data.results.length) { vinSuggestions.style.display = 'none'; return; }
+            data.results.forEach(c => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'list-group-item list-group-item-action';
+                item.innerHTML = `<strong>${c.vin}</strong> — ${c.make} ${c.model} <small class="text-muted">${c.customer}</small>`;
+                item.addEventListener('click', function() {
+                    vinInput.value = c.vin;
+                    vinSuggestions.style.display = 'none';
+                });
+                vinSuggestions.appendChild(item);
+            });
+            vinSuggestions.style.display = 'block';
+        });
+});
+
+document.addEventListener('click', function(e) {
+    if (!vinInput.contains(e.target) && !vinSuggestions.contains(e.target)) {
+        vinSuggestions.style.display = 'none';
+    }
+});
+</script>
+{% endblock %}
 {% block page_title %}Report{% endblock %}
 {% block content %}
 
@@ -25,7 +61,10 @@
         </div>
         <div class="col-md-2">
             <label class="form-label">VIN</label>
-            <input type="text" name="vin" class="form-control" placeholder="VIN number" value="{{ request.GET.vin }}">
+            <div class="position-relative">
+                <input type="text" name="vin" id="vin-search-report" class="form-control" placeholder="VIN number" value="{{ request.GET.vin }}" autocomplete="off">
+                <div id="vin-suggestions-report" class="list-group position-absolute w-100" style="z-index:1000;display:none;"></div>
+            </div>
         </div>
         <div class="col-md-1">
             <label class="form-label">Month</label>

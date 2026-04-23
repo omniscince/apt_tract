@@ -105,6 +105,10 @@ class UserDeleteView(View):
         if user == request.user:
             messages.error(request, 'You cannot delete yourself')
             return redirect('user_list')
+        has_invoices = user.created_invoices.exists() or user.completed_invoices.exists()
+        if has_invoices:
+            messages.error(request, f'Cannot delete {user.email} — they have existing invoices. Edit their account instead.')
+            return redirect('user_list')
         user.delete()
         messages.success(request, 'User deleted')
         return redirect('user_list')

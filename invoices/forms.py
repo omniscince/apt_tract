@@ -22,6 +22,8 @@ class InvoiceForm(forms.ModelForm):
             'class': 'form-control',
             'placeholder': 'Make (e.g. BMW)',
             'id': 'id_car_make',
+            'style': 'text-transform:uppercase;',
+            'oninput': 'this.value=this.value.toUpperCase()',
         }),
         label='Car Make'
     )
@@ -31,6 +33,8 @@ class InvoiceForm(forms.ModelForm):
             'class': 'form-control',
             'placeholder': 'Model (e.g. X5)',
             'id': 'id_car_model',
+            'style': 'text-transform:uppercase;',
+            'oninput': 'this.value=this.value.toUpperCase()',
         }),
         label='Car Model'
     )
@@ -124,7 +128,8 @@ class InvoiceItemForm(forms.ModelForm):
         widgets = {
             'description': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Service description'
+                'placeholder': 'Service description',
+                'autocomplete': 'off'
             }),
             'price': forms.NumberInput(attrs={
                 'class': 'form-control',
