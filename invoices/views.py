@@ -639,3 +639,80 @@ class InvoiceHistoryReportView(View):
         response['Content-Disposition'] = 'attachment; filename="Invoice_History_Report.xlsx"'
         response.write(buffer.read())
         return response
+
+
+@method_decorator(login_required, name='dispatch')
+class CrewReportView(View):
+    def get(self, request):
+        if request.user.role != 'owner':
+            return redirect('dashboard')
+        from users.models import User
+        from django.utils.dateparse import parse_date
+
+        start = request.GET.get('start')
+        end = request.GET.get('end')
+
+        invoices = Invoice.objects.all().select_related('work_completed_by')
+        if start:
+            invoices = invoices.filter(invoice_date__gte=parse_date(start))
+        if end:
+            invoices = invoices.filter(invoice_date__lte=parse_date(end))
+
+        staff_users = User.objects.filter(role='staff')
+        rows = []
+        for user in staff_users:
+            user_invoices = [inv for inv in invoices if inv.work_completed_by_id == user.id]
+            count = len(user_invoices)
+            subtotal = sum(inv.subtotal for inv in user_invoices)
+            gross = sum(inv.total for inv in user_invoices)
+            rows.append({'user': user, 'count': count, 'subtotal': subtotal, 'gross': gross})
+
+        return render(request, 'invoices/crew_report.html', {
+            'rows': rows,
+            'total_count': sum(r['count'] for r in rows),
+            'total_subtotal': sum(r['subtotal'] for r in rows),
+            'total_gross': sum(r['gross'] for r in rows),
+            'start': start or '',
+            'end': end or '',
+        })
+
+
+@method_decorator(login_required, name='dispatch')
+class CustomerReportView(View):
+    def get(self, request):
+        if request.user.role != 'owner':
+            return redirect('dashboard')
+        from django.utils.dateparse import parse_date
+
+        start = request.GET.get('start')
+        end = request.GET.get('end')
+
+        invoices = Invoice.objects.all().select_related('customer')
+        if start:
+            invoices = invoices.filter(invoice_date__gte=parse_date(start))
+        if end:
+            invoices = invoices.filter(invoice_date__lte=parse_date(end))
+
+        invoices_list = list(invoices)
+        customer_map = {}
+        for inv in invoices_list:
+            key = inv.customer_id if inv.customer_id else f'_noname_{inv.customer_name}'
+            if key not in customer_map:
+                customer_map[key] = {
+                    'name': inv.get_customer_display(),
+                    'count': 0, 'subtotal': 0, 'gross': 0
+                }
+            customer_map[key]['count'] += 1
+            customer_map[key]['subtotal'] += inv.subtotal
+            customer_map[key]['gross'] += inv.total
+
+        rows = sorted(customer_map.values(), key=lambda x: x['gross'], reverse=True)
+
+        return render(request, 'invoices/customer_report.html', {
+            'rows': rows,
+            'total_count': sum(r['count'] for r in rows),
+            'total_subtotal': sum(r['subtotal'] for r in rows),
+            'total_gross': sum(r['gross'] for r in rows),
+            'start': start or '',
+            'end': end or '',
+        })

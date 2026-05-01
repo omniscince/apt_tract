@@ -56,6 +56,12 @@
         {% endif %}
         {% if user.role == 'owner' %}
         <hr class="text-muted mx-3">
+        <a href="{% url 'crew_report' %}" class="nav-link {% if request.resolver_match.url_name == 'crew_report' %}active{% endif %}">
+            <i class="bi bi-person-lines-fill"></i> Crew Report
+        </a>
+        <a href="{% url 'customer_report' %}" class="nav-link {% if request.resolver_match.url_name == 'customer_report' %}active{% endif %}">
+            <i class="bi bi-people-fill"></i> Customer Report
+        </a>
         <a href="{% url 'user_list' %}" class="nav-link {% if 'user' in request.resolver_match.url_name %}active{% endif %}">
             <i class="bi bi-people"></i> Users
         </a>
