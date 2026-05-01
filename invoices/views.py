@@ -243,9 +243,6 @@ class InvoiceEditView(View):
 class InvoiceDetailView(View):
     def get(self, request, pk):
         invoice = get_object_or_404(Invoice, pk=pk)
-        if request.user.role == 'staff' and invoice.created_by != request.user and invoice.work_completed_by != request.user:
-            messages.error(request, 'Access denied')
-            return redirect('invoice_list')
         return render(request, 'invoices/invoice_detail.html', {'invoice': invoice})
 
 
@@ -439,9 +436,13 @@ class MonthlyReportPDFView(View):
         if vin:
             invoices = invoices.filter(car__vin__icontains=vin)
 
+        customer = None
+        if customer_id:
+            from customers.models import Customer as C
+            customer = C.objects.filter(pk=customer_id).first()
         response = HttpResponse(content_type='application/pdf')
-        response['Content-Disposition'] = 'attachment; filename="report.pdf"'
-        generate_monthly_report_pdf(response, invoices)
+        response['Content-Disposition'] = 'attachment; filename="Invoice_Statement.pdf"'
+        generate_monthly_report_pdf(response, invoices, customer=customer)
         return response
 
 
@@ -465,7 +466,7 @@ class SendStatementView(View):
             invoices = invoices.filter(invoice_date__year=year)
 
         buffer = io.BytesIO()
-        generate_monthly_report_pdf(buffer, invoices)
+        generate_monthly_report_pdf(buffer, invoices, customer=customer)
         buffer.seek(0)
 
         email_msg = EmailMessage(

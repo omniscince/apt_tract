@@ -232,8 +232,7 @@ def generate_invoice_pdf(response, invoice):
     doc.build(story)
 
 
-def generate_monthly_report_pdf(response, invoices):
-    import calendar
+def generate_monthly_report_pdf(response, invoices, customer=None):
     from django.utils import timezone
 
     doc = SimpleDocTemplate(response, pagesize=letter,
@@ -243,11 +242,12 @@ def generate_monthly_report_pdf(response, invoices):
     story = []
 
     bold_style = ParagraphStyle('Bold', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10)
-    company_style = ParagraphStyle('CompanyName', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=15, spaceAfter=0, spaceBefore=0, leading=18)
+    bold_style2 = ParagraphStyle('Bold2', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9)
     normal_style = ParagraphStyle('Normal2', parent=styles['Normal'], fontSize=9)
-    title_style = ParagraphStyle('Title2', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=14, alignment=TA_CENTER)
+    title_style = ParagraphStyle('Title2', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=13, alignment=TA_CENTER)
     right_style = ParagraphStyle('Right', parent=styles['Normal'], fontSize=9, alignment=TA_RIGHT)
     right_bold = ParagraphStyle('RightBold', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, alignment=TA_RIGHT)
+    company_style = ParagraphStyle('CompanyName', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=13, spaceAfter=0, spaceBefore=0, leading=13)
 
     logo_path = get_logo()
     if logo_path:
@@ -256,67 +256,109 @@ def generate_monthly_report_pdf(response, invoices):
     else:
         logo_cell = Paragraph('<b>///APT</b>', bold_style)
 
+    # Title
+    story.append(Paragraph("<b>Invoice Statement</b>", title_style))
+    story.append(Spacer(1, 0.15*inch))
+
+    # Header: company left, logo right
     header_data = [
-        [Paragraph(f"<b>{COMPANY_NAME}</b>", bold_style), logo_cell],
+        [Paragraph(f"<b>{COMPANY_NAME}</b>", company_style), logo_cell],
         [Paragraph(COMPANY_ADDRESS, normal_style), ''],
         [Paragraph(COMPANY_CITY, normal_style), ''],
         [Paragraph(COMPANY_PHONE, normal_style), ''],
         [Paragraph(COMPANY_EMAIL, normal_style), ''],
         [Paragraph(COMPANY_HST, normal_style), ''],
     ]
-
     header_table = Table(header_data, colWidths=[4*inch, 3.5*inch])
     header_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (0, 0), 1),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 2),
+        ('TOPPADDING', (0, 0), (-1, -1), 0),
     ]))
     story.append(header_table)
-    story.append(Spacer(1, 0.1*inch))
+    story.append(Spacer(1, 0.15*inch))
 
-    today = timezone.now().strftime('%B %d, %Y')
-    story.append(Paragraph(f"<b>Invoice Statement</b> — Generated: {today}", title_style))
+    # Billing address + statement date
+    now_str = timezone.now().strftime('%m/%d/%Y %I:%M %p')
+    if customer:
+        addr_lines = [f'<b>{customer.name}</b>']
+        if customer.address:
+            addr_lines.append(customer.address)
+        if customer.city or customer.province:
+            addr_lines.append(f"{customer.city}, {customer.province}")
+        if customer.phone:
+            addr_lines.append(f'<b>Primary Phone:</b> {customer.phone}')
+        emails = customer.get_all_emails()
+        if emails:
+            addr_lines.append(f'<b>Email:</b> {emails[0]}')
+        billing_text = '<br/>'.join(addr_lines)
+    else:
+        billing_text = ''
+
+    billing_data = [
+        [Paragraph('<b>Billing Address:</b>', bold_style),
+         Paragraph(f'<b>Statement Date: {now_str}</b>', ParagraphStyle('RightBold2', parent=bold_style, alignment=TA_RIGHT))],
+        [Paragraph(billing_text, normal_style), ''],
+    ]
+    billing_table = Table(billing_data, colWidths=[4*inch, 3.5*inch])
+    billing_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+    ]))
+    story.append(billing_table)
     story.append(Spacer(1, 0.2*inch))
 
+    # Invoice table — full width 7.5 inch
+    total_width = 7.5*inch
+    col_widths = [1.6*inch, 1.0*inch, 1.0*inch, 1.0*inch, 0.97*inch, 0.97*inch, 0.97*inch]
     table_data = [[
-        Paragraph('<b>Invoice #</b>', bold_style),
-        Paragraph('<b>Date</b>', bold_style),
-        Paragraph('<b>Customer</b>', bold_style),
-        Paragraph('<b>Car</b>', bold_style),
-        Paragraph('<b>Staff</b>', bold_style),
-        Paragraph('<b>Total</b>', bold_style),
+        Paragraph('<b>Invoice Number</b>', bold_style2),
+        Paragraph('<b>Invoice Date</b>', bold_style2),
+        Paragraph('<b>Due Date</b>', bold_style2),
+        Paragraph('<b>Invoice Status</b>', bold_style2),
+        Paragraph('<b>Total</b>', bold_style2),
+        Paragraph('<b>Paid</b>', bold_style2),
+        Paragraph('<b>Balance</b>', bold_style2),
     ]]
 
     grand_total = 0
     for inv in invoices:
-        grand_total += inv.total
+        total = inv.total
+        grand_total += total
+        due_date_str = inv.due_date.strftime('%m/%d/%Y') if inv.due_date else ''
         table_data.append([
-            Paragraph(inv.invoice_number, normal_style),
-            Paragraph(inv.invoice_date.strftime('%B %d, %Y'), normal_style),
-            Paragraph(inv.get_customer_display(), normal_style),
-            Paragraph(inv.get_car_display()[:30], normal_style),
-            Paragraph(inv.created_by.get_full_name() if inv.created_by else '', normal_style),
-            Paragraph(f'${inv.total:,.2f}', right_style),
+            Paragraph(f'<b>{inv.invoice_number}</b>', normal_style),
+            Paragraph(inv.invoice_date.strftime('%m/%d/%Y'), normal_style),
+            Paragraph(due_date_str, normal_style),
+            Paragraph(inv.get_status_display(), normal_style),
+            Paragraph(f'${total:,.2f}', right_style),
+            Paragraph('$0.00', right_style),
+            Paragraph(f'${total:,.2f}', right_style),
         ])
 
     table_data.append([
-        '', '', '', '',
-        Paragraph('<b>Total:</b>', right_bold),
+        '', '', '', '', '',
+        Paragraph('<b>Total Due</b>', right_bold),
         Paragraph(f'<b>${grand_total:,.2f}</b>', right_bold),
     ])
 
-    col_widths = [1.2*inch, 0.9*inch, 1.7*inch, 1.5*inch, 1.2*inch, 1*inch]
     inv_table = Table(table_data, colWidths=col_widths)
     inv_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f0f0f0')),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.white),
+        ('LINEBELOW', (0, 0), (-1, 0), 0.5, colors.black),
         ('BOX', (0, 0), (-1, -2), 0.5, colors.black),
-        ('INNERGRID', (0, 0), (-1, -2), 0.25, colors.HexColor('#dddddd')),
-        ('PADDING', (0, 0), (-1, -1), 5),
+        ('INNERGRID', (0, 1), (-1, -2), 0.25, colors.HexColor('#eeeeee')),
+        ('PADDING', (0, 0), (-1, -1), 6),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('LINEABOVE', (0, -1), (-1, -1), 0.5, colors.black),
+        ('ALIGN', (4, 0), (-1, -1), 'RIGHT'),
     ]))
     story.append(inv_table)
     story.append(Spacer(1, 0.2*inch))
-    story.append(Paragraph("Thank you for your business", normal_style))
+    story.append(Paragraph('<b>Comments:</b>', bold_style))
+    story.append(Paragraph('Thank you for your business', normal_style))
 
     doc.build(story)
