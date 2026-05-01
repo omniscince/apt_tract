@@ -4,7 +4,7 @@
 {% block content %}
 
 <div class="d-flex justify-content-between mb-4">
-    <a href="{% url 'invoice_list' %}" class="btn btn-outline-secondary btn-sm">← Back</a>
+    <button onclick="history.back()" class="btn btn-outline-secondary btn-sm">← Back</button>
     <div class="d-flex gap-2 align-items-center">
         {% if invoice.status == 'final' %}
         <span class="badge bg-success fs-6">Final</span>
