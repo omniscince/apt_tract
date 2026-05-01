@@ -131,5 +131,27 @@ function showDeleteModal(pk, name) {
     document.getElementById('delete-form').action = '/invoices/' + pk + '/delete/';
     document.getElementById('delete-modal').style.display = 'flex';
 }
+
+// Save/restore filters
+const filterKey = 'invoice_filters';
+const form = document.querySelector('form[method="get"]');
+
+if (!window.location.search) {
+    const saved = localStorage.getItem(filterKey);
+    if (saved) {
+        window.location.search = saved;
+    }
+}
+
+if (form) {
+    form.addEventListener('submit', function() {
+        const params = new URLSearchParams(new FormData(form));
+        localStorage.setItem(filterKey, params.toString());
+    });
+}
+
+document.querySelector('a[href$="invoices/"]') && document.querySelector('a[href$="invoices/"]').addEventListener('click', function() {
+    localStorage.removeItem(filterKey);
+});
 </script>
 {% endblock %}

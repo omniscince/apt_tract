@@ -1,45 +1,102 @@
 {% extends 'base.html' %}
 {% block title %}Dashboard - AutoPro{% endblock %}
+
+{% block scripts %}
+<script>
+const customerSearch = document.getElementById('customer-search');
+const customerId = document.getElementById('customer-id');
+const customerSuggestions = document.getElementById('customer-suggestions');
+
+// Set initial value
+{% if selected_customer %}
+fetch('/api/customers/search/?q=')
+    .then(r => r.json())
+    .then(data => {
+        const found = data.results.find(c => c.id == {{ selected_customer }});
+        if (found) customerSearch.value = found.name;
+    });
+{% endif %}
+
+customerSearch.addEventListener('input', function() {
+    const q = this.value.trim();
+    if (q.length < 1) {
+        customerSuggestions.style.display = 'none';
+        customerId.value = '';
+        return;
+    }
+    fetch(`/api/customers/search/?q=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(data => {
+            customerSuggestions.innerHTML = '';
+            if (!data.results.length) { customerSuggestions.style.display = 'none'; return; }
+            data.results.forEach(c => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'list-group-item list-group-item-action py-1';
+                item.textContent = c.name;
+                item.addEventListener('click', function() {
+                    customerSearch.value = c.name;
+                    customerId.value = c.id;
+                    customerSuggestions.style.display = 'none';
+                });
+                customerSuggestions.appendChild(item);
+            });
+            customerSuggestions.style.display = 'block';
+        });
+});
+
+document.addEventListener('click', function(e) {
+    if (!customerSearch.contains(e.target) && !customerSuggestions.contains(e.target)) {
+        customerSuggestions.style.display = 'none';
+    }
+});
+</script>
+{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
 {% block content %}
 
-{% if user.role == 'client' %}
-<h4 class="mb-4">My Invoices</h4>
-<div class="card">
-    <div class="table-responsive">
-        <table class="table table-hover mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>Invoice #</th>
-                    <th>Car</th>
-                    <th>Date</th>
-                    <th>Total</th>
-                    <th>Status</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for inv in my_invoices %}
-                <tr>
-                    <td><strong>{{ inv.invoice_number }}</strong></td>
-                    <td>{{ inv.car.make }} {{ inv.car.model }}</td>
-                    <td>{{ inv.invoice_date|date:"N j, Y" }}</td>
-                    <td>${{ inv.total }}</td>
-                    <td><span class="badge bg-success">{{ inv.status|upper }}</span></td>
-                    <td>
-                        <a href="{% url 'invoice_detail' inv.pk %}" class="btn btn-sm btn-outline-primary">View</a>
-                        <a href="{% url 'invoice_pdf' inv.pk %}" class="btn btn-sm btn-outline-success">PDF</a>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="6" class="text-center text-muted py-4">No invoices yet</td></tr>
+{% if user.role != 'client' %}
+<div class="card p-3 mb-4">
+    <form method="get" class="row g-2 align-items-end">
+        <div class="col-md-auto">
+            <div class="btn-group" role="group">
+                <a href="?period=today" class="btn btn-sm {% if period == 'today' %}btn-primary{% else %}btn-outline-primary{% endif %}">Today</a>
+                <a href="?period=week" class="btn btn-sm {% if period == 'week' %}btn-primary{% else %}btn-outline-primary{% endif %}">This Week</a>
+                <a href="?period=month" class="btn btn-sm {% if period == 'month' %}btn-primary{% else %}btn-outline-primary{% endif %}">This Month</a>
+                <a href="?period=custom" class="btn btn-sm {% if period == 'custom' %}btn-primary{% else %}btn-outline-primary{% endif %}">Custom</a>
+            </div>
+        </div>
+        {% if period == 'custom' %}
+        <div class="col-md-2">
+            <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from }}">
+        </div>
+        <div class="col-md-2">
+            <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to }}">
+        </div>
+        <input type="hidden" name="period" value="custom">
+        {% endif %}
+        <div class="col-md-2 position-relative">
+            <input type="text" id="customer-search" class="form-control form-control-sm" placeholder="All Customers" autocomplete="off">
+            <input type="hidden" name="customer" id="customer-id" value="{{ selected_customer }}">
+            <div id="customer-suggestions" class="list-group position-absolute w-100" style="z-index:1000;display:none;max-height:200px;overflow-y:auto;"></div>
+        </div>
+        {% if user.role == 'owner' %}
+        <div class="col-md-2">
+            <select name="staff" class="form-control form-control-sm">
+                <option value="">All Staff</option>
+                {% for s in staff_list %}
+                <option value="{{ s.pk }}" {% if selected_staff == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.get_full_name }}</option>
                 {% endfor %}
-            </tbody>
-        </table>
-    </div>
+            </select>
+        </div>
+        {% endif %}
+        <div class="col-md-auto">
+            <button type="submit" class="btn btn-sm btn-secondary">Filter</button>
+            <a href="{% url 'dashboard' %}" class="btn btn-sm btn-outline-secondary">Reset</a>
+        </div>
+    </form>
 </div>
 
-{% else %}
 <div class="row g-4 mb-4">
     <div class="col-md-3">
         <div class="card p-3 text-center">
@@ -47,22 +104,23 @@
             <small class="text-muted">Total Invoices</small>
         </div>
     </div>
+    {% if user.role == 'owner' %}
     <div class="col-md-3">
         <div class="card p-3 text-center">
             <h2 class="mb-0 text-success">{{ total_customers }}</h2>
             <small class="text-muted">Customers</small>
         </div>
     </div>
+    {% endif %}
+    <div class="col-md-3">
+        <div class="card p-3 text-center">
+            <h2 class="mb-0 text-warning">${{ total_amount }}</h2>
+            <small class="text-muted">Total Amount</small>
+        </div>
+    </div>
 </div>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h5>Recent Invoices</h5>
-    {% if user.role in 'owner,staff' %}
-    <a href="{% url 'invoice_create' %}" class="btn btn-primary btn-sm">
-        <i class="bi bi-plus"></i> New Invoice
-    </a>
-    {% endif %}
-</div>
+<h5 class="mb-3">Recent Invoices</h5>
 <div class="card">
     <div class="table-responsive">
         <table class="table table-hover mb-0">
@@ -81,17 +139,15 @@
                 {% for inv in recent_invoices %}
                 <tr>
                     <td><strong>{{ inv.invoice_number }}</strong></td>
-                    <td>{{ inv.customer.name }}</td>
-                    <td>{{ inv.car.make }} {{ inv.car.model }}</td>
+                    <td>{{ inv.get_customer_display }}</td>
+                    <td>{{ inv.get_car_display|truncatechars:20 }}</td>
                     <td>{{ inv.invoice_date|date:"N j, Y" }}</td>
                     <td>${{ inv.total }}</td>
                     <td><span class="badge bg-success">{{ inv.status|upper }}</span></td>
-                    <td>
-                        <a href="{% url 'invoice_detail' inv.pk %}" class="btn btn-sm btn-outline-primary">View</a>
-                    </td>
+                    <td><a href="{% url 'invoice_detail' inv.pk %}" class="btn btn-sm btn-outline-primary">View</a></td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="7" class="text-center text-muted py-4">No invoices yet</td></tr>
+                <tr><td colspan="7" class="text-center text-muted py-4">No invoices found</td></tr>
                 {% endfor %}
             </tbody>
         </table>

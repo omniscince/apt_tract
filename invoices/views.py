@@ -88,18 +88,58 @@ def get_or_create_customer_and_car(form, invoice):
 @method_decorator(login_required, name='dispatch')
 class DashboardView(View):
     def get(self, request):
+        from datetime import date, timedelta
         user = request.user
         if user.role == 'staff':
-            invoices_qs = Invoice.objects.filter(created_by=user)
+            invoices_qs = Invoice.objects.filter(
+                models.Q(created_by=user) | models.Q(work_completed_by=user)
+            ).distinct()
         else:
             invoices_qs = Invoice.objects.all()
 
+        period = request.GET.get('period', 'month')
+        customer_id = request.GET.get('customer')
+        staff_id = request.GET.get('staff')
+        date_from = request.GET.get('date_from')
+        date_to = request.GET.get('date_to')
+        today = date.today()
+
+        if period == 'today':
+            invoices_qs = invoices_qs.filter(invoice_date=today)
+        elif period == 'week':
+            week_start = today - timedelta(days=today.weekday())
+            invoices_qs = invoices_qs.filter(invoice_date__gte=week_start, invoice_date__lte=today)
+        elif period == 'month':
+            invoices_qs = invoices_qs.filter(invoice_date__year=today.year, invoice_date__month=today.month)
+        elif period == 'custom':
+            if date_from:
+                invoices_qs = invoices_qs.filter(invoice_date__gte=date_from)
+            if date_to:
+                invoices_qs = invoices_qs.filter(invoice_date__lte=date_to)
+
+        if customer_id:
+            invoices_qs = invoices_qs.filter(customer_id=customer_id)
+        if staff_id and user.role == 'owner':
+            invoices_qs = invoices_qs.filter(
+                models.Q(created_by_id=staff_id) | models.Q(work_completed_by_id=staff_id)
+            )
+
+        invoices_list = list(invoices_qs.select_related('customer', 'car', 'created_by'))
+        total_amount = sum(inv.total for inv in invoices_list)
+
+        from users.models import User as UserModel
         context = {
-            'total_invoices': invoices_qs.count(),
+            'total_invoices': len(invoices_list),
             'total_customers': Customer.objects.count(),
-            'recent_invoices': invoices_qs.select_related(
-                'customer', 'car', 'created_by'
-            ).order_by('-created_at')[:10],
+            'total_amount': total_amount,
+            'recent_invoices': invoices_list[:20],
+            'period': period,
+            'date_from': date_from,
+            'date_to': date_to,
+            'selected_customer': customer_id,
+            'selected_staff': staff_id,
+            'customers': Customer.objects.all(),
+            'staff_list': UserModel.objects.all(),
         }
         return render(request, 'invoices/dashboard.html', context)
 
