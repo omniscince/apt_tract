@@ -15,4 +15,5 @@ urlpatterns = [
     path('reports/send-statement/', views.SendStatementView.as_view(), name='send_statement'),
     path('api/customers/search/', views.CustomerSearchView.as_view(), name='customer_search'),
     path('invoices/statement-preview/', views.StatementPreviewView.as_view(), name='statement_preview'),
+    path('reports/invoice-history/', views.InvoiceHistoryReportView.as_view(), name='invoice_history_report'),
 ]

@@ -85,6 +85,7 @@ document.addEventListener('click', function(e) {
             <button type="submit" class="btn btn-primary">Filter</button>
             <a href="{% url 'monthly_report' %}" class="btn btn-outline-secondary">Reset</a>
             <a href="{% url 'monthly_report_pdf' %}?{{ request.GET.urlencode }}" class="btn btn-success">Download Statement</a>
+            <a href="{% url 'invoice_history_report' %}?{{ request.GET.urlencode }}" class="btn btn-outline-success">Download Invoice History Report</a>
         </div>
     </form>
 </div>

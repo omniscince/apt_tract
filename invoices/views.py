@@ -503,3 +503,99 @@ class StatementPreviewView(View):
         response['Content-Disposition'] = 'inline; filename="preview.pdf"'
         generate_monthly_report_pdf(response, invoices, customer=customer)
         return response
+
+
+@method_decorator(login_required, name='dispatch')
+class InvoiceHistoryReportView(View):
+    def get(self, request):
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment
+        import io
+
+        invoices = Invoice.objects.all().select_related('customer', 'car', 'created_by', 'work_completed_by')
+
+        customer_id = request.GET.get('customer')
+        staff_id = request.GET.get('staff')
+        month = request.GET.get('month')
+        year = request.GET.get('year')
+        date_from = request.GET.get('date_from')
+        date_to = request.GET.get('date_to')
+        vin = request.GET.get('vin')
+
+        if customer_id:
+            invoices = invoices.filter(customer_id=customer_id)
+        if staff_id:
+            invoices = invoices.filter(created_by_id=staff_id)
+        if month:
+            try:
+                invoices = invoices.filter(invoice_date__month=int(month))
+            except (ValueError, TypeError):
+                pass
+        if year and not date_from:
+            try:
+                invoices = invoices.filter(invoice_date__year=int(year))
+            except (ValueError, TypeError):
+                pass
+        if date_from:
+            invoices = invoices.filter(invoice_date__gte=date_from)
+        if date_to:
+            invoices = invoices.filter(invoice_date__lte=date_to)
+        if vin:
+            invoices = invoices.filter(car__vin__icontains=vin)
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = 'Invoice History'
+
+        headers = ['Invoice Number', 'Invoice Date', 'Total', 'Customer', 'Description',
+                   'Asset Name', 'Stock #', 'VIN Number', 'User', 'Work Completed By']
+
+        header_font = Font(bold=True)
+        header_fill = PatternFill(start_color='F0F0F0', end_color='F0F0F0', fill_type='solid')
+
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center')
+
+        row = 2
+        for inv in invoices:
+            items = list(inv.items.all())
+            if not items:
+                items = [None]
+            for i, item in enumerate(items):
+                ws.cell(row=row, column=1, value=inv.invoice_number if i == 0 else '')
+                ws.cell(row=row, column=2, value=inv.invoice_date.strftime('%m/%d/%Y') if i == 0 else '')
+                ws.cell(row=row, column=3, value=float(inv.total) if i == 0 else '')
+                ws.cell(row=row, column=4, value=inv.get_customer_display() if i == 0 else '')
+                ws.cell(row=row, column=5, value=item.description if item else '')
+                asset_name = f'{inv.car.make} {inv.car.model}' if inv.car and i == 0 else (inv.car_info if i == 0 else '')
+                ws.cell(row=row, column=6, value=asset_name)
+                ws.cell(row=row, column=7, value=inv.car.stock_number if inv.car and inv.car.stock_number and i == 0 else '')
+                ws.cell(row=row, column=8, value=inv.car.vin if inv.car and inv.car.vin and i == 0 else '')
+                ws.cell(row=row, column=9, value=inv.created_by.get_full_name() if inv.created_by and i == 0 else '')
+                ws.cell(row=row, column=10, value=inv.work_completed_by.get_full_name() if inv.work_completed_by and i == 0 else '')
+                row += 1
+
+        from openpyxl.styles import Border, Side
+        thin = Side(style='thin')
+        border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+        fixed_widths = [16, 12, 10, 25, 35, 18, 12, 16, 20, 20]
+        for i, col in enumerate(ws.columns):
+            col_letter = col[0].column_letter
+            ws.column_dimensions[col_letter].width = fixed_widths[i] if i < len(fixed_widths) else 15
+            for cell in col:
+                cell.border = border
+                if cell.row > 1:
+                    cell.alignment = Alignment(wrap_text=True, vertical='top')
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename="Invoice_History_Report.xlsx"'
+        response.write(buffer.read())
+        return response
