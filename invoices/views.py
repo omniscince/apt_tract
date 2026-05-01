@@ -726,7 +726,9 @@ class DownloadDatabaseView(View):
         import os
         from django.conf import settings as django_settings
         db_path = django_settings.DATABASES['default']['NAME']
+        from datetime import date as _date
+        site_name = 'devapt' if 'apt_tract_dev' in str(db_path) else 'apt'
         with open(db_path, 'rb') as f:
             response = HttpResponse(f.read(), content_type='application/octet-stream')
-            response['Content-Disposition'] = 'attachment; filename="db_backup.sqlite3"'
-            return response
+        response['Content-Disposition'] = f'attachment; filename="db_{site_name}_{_date.today()}.sqlite3"'
+        return response
