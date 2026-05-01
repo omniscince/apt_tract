@@ -65,6 +65,9 @@
         <a href="{% url 'user_list' %}" class="nav-link {% if 'user' in request.resolver_match.url_name %}active{% endif %}">
             <i class="bi bi-people"></i> Users
         </a>
+        <a href="{% url 'download_db' %}" class="nav-link">
+            <i class="bi bi-download"></i> Backup DB
+        </a>
         {% endif %}
     </nav>
 </div>

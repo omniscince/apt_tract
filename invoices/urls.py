@@ -18,4 +18,5 @@ urlpatterns = [
     path('reports/invoice-history/', views.InvoiceHistoryReportView.as_view(), name='invoice_history_report'),
     path('reports/crew/', views.CrewReportView.as_view(), name='crew_report'),
     path('reports/customers/', views.CustomerReportView.as_view(), name='customer_report'),
+    path('download-db/', views.DownloadDatabaseView.as_view(), name='download_db'),
 ]

@@ -716,3 +716,17 @@ class CustomerReportView(View):
             'start': start or '',
             'end': end or '',
         })
+
+
+@method_decorator(login_required, name='dispatch')
+class DownloadDatabaseView(View):
+    def get(self, request):
+        if request.user.role != 'owner':
+            return redirect('dashboard')
+        import os
+        from django.conf import settings as django_settings
+        db_path = django_settings.DATABASES['default']['NAME']
+        with open(db_path, 'rb') as f:
+            response = HttpResponse(f.read(), content_type='application/octet-stream')
+            response['Content-Disposition'] = 'attachment; filename="db_backup.sqlite3"'
+            return response
