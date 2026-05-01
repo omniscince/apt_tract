@@ -1,3 +1,4 @@
+from django.db import models
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -8,6 +9,7 @@ from django.utils import timezone
 from django.core.mail import EmailMessage
 from django.conf import settings
 import io
+import threading
 from .models import Invoice, InvoiceItem
 from .forms import InvoiceForm, InvoiceItemFormSet
 from .pdf import generate_invoice_pdf, generate_monthly_report_pdf
@@ -107,7 +109,9 @@ class InvoiceListView(View):
     def get(self, request):
         user = request.user
         if user.role == 'staff':
-            invoices = Invoice.objects.filter(created_by=user).select_related('customer', 'car', 'created_by')
+            invoices = Invoice.objects.filter(
+                models.Q(created_by=user) | models.Q(work_completed_by=user)
+            ).distinct().select_related('customer', 'car', 'created_by')
         else:
             invoices = Invoice.objects.all().select_related('customer', 'car', 'created_by')
 
@@ -147,7 +151,7 @@ class InvoiceListView(View):
 @method_decorator(login_required, name='dispatch')
 class InvoiceCreateView(View):
     def get(self, request):
-        form = InvoiceForm()
+        form = InvoiceForm(user=request.user)
         formset = InvoiceItemFormSet()
         return render(request, 'invoices/invoice_form.html', {
             'form': form,
@@ -156,12 +160,19 @@ class InvoiceCreateView(View):
         })
 
     def post(self, request):
-        form = InvoiceForm(request.POST)
+        form = InvoiceForm(request.POST, user=request.user)
         formset = InvoiceItemFormSet(request.POST)
         if form.is_valid() and formset.is_valid():
             invoice = form.save(commit=False)
             invoice.created_by = request.user
             invoice.status = 'final'
+            if request.user.role == 'owner':
+                num = form.cleaned_data.get('invoice_number_override', '').strip()
+                if num:
+                    if Invoice.objects.filter(invoice_number=num).exists():
+                        messages.error(request, f'Invoice #{num} already exists. Choose a different number.')
+                        return render(request, 'invoices/invoice_form.html', {'form': form, 'formset': formset, 'title': 'Create Invoice'})
+                    invoice.invoice_number = num
             invoice = get_or_create_customer_and_car(form, invoice)
             invoice.save()
             formset.instance = invoice
@@ -179,10 +190,21 @@ class InvoiceCreateView(View):
 class InvoiceEditView(View):
     def get(self, request, pk):
         invoice = get_object_or_404(Invoice, pk=pk)
-        if request.user.role == 'staff' and invoice.created_by != request.user:
+        if request.user.role == 'staff' and invoice.created_by != request.user and invoice.work_completed_by != request.user:
             messages.error(request, 'Access denied')
             return redirect('invoice_list')
-        form = InvoiceForm(instance=invoice)
+        initial = {
+            'customer_name': invoice.get_customer_display(),
+            'invoice_number_override': invoice.invoice_number,
+        }
+        if invoice.car:
+            initial['car_make'] = invoice.car.make
+            initial['car_model'] = invoice.car.model
+            initial['car_vin'] = invoice.car.vin
+            initial['car_stock'] = invoice.car.stock_number
+        elif invoice.car_info:
+            initial['car_make'] = invoice.car_info
+        form = InvoiceForm(instance=invoice, user=request.user, initial=initial)
         formset = InvoiceItemFormSet(instance=invoice)
         return render(request, 'invoices/invoice_form.html', {
             'form': form,
@@ -193,13 +215,17 @@ class InvoiceEditView(View):
 
     def post(self, request, pk):
         invoice = get_object_or_404(Invoice, pk=pk)
-        if request.user.role == 'staff' and invoice.created_by != request.user:
+        if request.user.role == 'staff' and invoice.created_by != request.user and invoice.work_completed_by != request.user:
             messages.error(request, 'Access denied')
             return redirect('invoice_list')
-        form = InvoiceForm(request.POST, instance=invoice)
+        form = InvoiceForm(request.POST, instance=invoice, user=request.user)
         formset = InvoiceItemFormSet(request.POST, instance=invoice)
         if form.is_valid() and formset.is_valid():
             invoice = form.save(commit=False)
+            if request.user.role == 'owner':
+                num = form.cleaned_data.get('invoice_number_override', '').strip()
+                if num:
+                    invoice.invoice_number = num
             invoice = get_or_create_customer_and_car(form, invoice)
             invoice.save()
             formset.save()
@@ -217,9 +243,6 @@ class InvoiceEditView(View):
 class InvoiceDetailView(View):
     def get(self, request, pk):
         invoice = get_object_or_404(Invoice, pk=pk)
-        if request.user.role == 'staff' and invoice.created_by != request.user:
-            messages.error(request, 'Access denied')
-            return redirect('invoice_list')
         return render(request, 'invoices/invoice_detail.html', {'invoice': invoice})
 
 
@@ -247,15 +270,13 @@ class InvoiceActionView(View):
                 subject=f'Your Invoice from AutoProTinting — #{invoice.invoice_number}',
                 body=(
                     f'Dear {customer_name},\n\n'
-                    f'Please find your invoice attached.\n\n'
-                    f'We kindly ask you to complete the payment according to our agreement '
-                    f'at your earliest convenience.\n\n'
-                    f'If you have any questions or need any clarification, feel free to reach out '
-                    f'— we\'re always happy to help.\n\n'
-                    f'Thank you for choosing AutoProTinting. We truly appreciate your business '
-                    f'and look forward to working with you again.\n\n'
-                    f'Best regards,\n'
-                    f'AutoProTinting Team'
+                    f'Here\'s your invoice! We appreciate your prompt payment. Thanks for your business!\n\n'
+                    f'To view and print the attached invoice, double-click on the invoice icon, '
+                    f'and then choose File, Print when the invoice is displayed. '
+                    f'To save the invoice, copy it from this e-mail to another folder on your computer.\n\n'
+                    f'If you have any questions regarding this invoice, please contact Accounting at (647) 771-1112\n\n'
+                    f'Regards,\n'
+                    f'Accounting Department, Autoprotinting'
                 ),
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 to=emails,
@@ -265,16 +286,13 @@ class InvoiceActionView(View):
                 buffer.read(),
                 'application/pdf'
             )
-            import threading
-            def send_email_async():
+            def send_email():
                 try:
                     email_msg.send()
                 except Exception:
                     pass
 
-            thread = threading.Thread(target=send_email_async)
-            thread.daemon = True
-            thread.start()
+            threading.Thread(target=send_email, daemon=True).start()
             invoice.status = 'final'
             invoice.save()
             messages.success(request, f'Invoice sent to {", ".join(emails)}')
@@ -306,8 +324,8 @@ class InvoicePDFView(View):
 class InvoiceDeleteView(View):
     def post(self, request, pk):
         invoice = get_object_or_404(Invoice, pk=pk)
-        if request.user.role == 'staff' and invoice.created_by != request.user:
-            messages.error(request, 'Access denied')
+        if request.user.role == 'staff':
+            messages.error(request, 'Access denied — staff cannot delete invoices')
             return redirect('invoice_list')
         invoice.delete()
         messages.success(request, 'Invoice deleted')
@@ -354,9 +372,15 @@ class MonthlyReportView(View):
         if staff_id:
             invoices = invoices.filter(created_by_id=staff_id)
         if month:
-            invoices = invoices.filter(invoice_date__month=month)
+            try:
+                invoices = invoices.filter(invoice_date__month=int(month))
+            except (ValueError, TypeError):
+                pass
         if year and not date_from:
-            invoices = invoices.filter(invoice_date__year=year)
+            try:
+                invoices = invoices.filter(invoice_date__year=int(year))
+            except (ValueError, TypeError):
+                pass
         if date_from:
             invoices = invoices.filter(invoice_date__gte=date_from)
         if date_to:
@@ -396,9 +420,15 @@ class MonthlyReportPDFView(View):
         if staff_id:
             invoices = invoices.filter(created_by_id=staff_id)
         if month:
-            invoices = invoices.filter(invoice_date__month=month)
+            try:
+                invoices = invoices.filter(invoice_date__month=int(month))
+            except (ValueError, TypeError):
+                pass
         if year and not date_from:
-            invoices = invoices.filter(invoice_date__year=year)
+            try:
+                invoices = invoices.filter(invoice_date__year=int(year))
+            except (ValueError, TypeError):
+                pass
         if date_from:
             invoices = invoices.filter(invoice_date__gte=date_from)
         if date_to:
@@ -406,9 +436,13 @@ class MonthlyReportPDFView(View):
         if vin:
             invoices = invoices.filter(car__vin__icontains=vin)
 
+        customer = None
+        if customer_id:
+            from customers.models import Customer as C
+            customer = C.objects.filter(pk=customer_id).first()
         response = HttpResponse(content_type='application/pdf')
-        response['Content-Disposition'] = 'attachment; filename="report.pdf"'
-        generate_monthly_report_pdf(response, invoices)
+        response['Content-Disposition'] = 'attachment; filename="Invoice_Statement.pdf"'
+        generate_monthly_report_pdf(response, invoices, customer=customer)
         return response
 
 
@@ -432,7 +466,7 @@ class SendStatementView(View):
             invoices = invoices.filter(invoice_date__year=year)
 
         buffer = io.BytesIO()
-        generate_monthly_report_pdf(buffer, invoices)
+        generate_monthly_report_pdf(buffer, invoices, customer=customer)
         buffer.seek(0)
 
         email_msg = EmailMessage(
@@ -448,9 +482,12 @@ class SendStatementView(View):
             to=emails,
         )
         email_msg.attach('statement.pdf', buffer.read(), 'application/pdf')
-        try:
-            email_msg.send()
-            messages.success(request, f'Statement sent to {", ".join(emails)}')
-        except Exception as e:
-            messages.error(request, f'Failed to send: {str(e)}')
+        def send_statement():
+            try:
+                email_msg.send()
+            except Exception:
+                pass
+
+        threading.Thread(target=send_statement, daemon=True).start()
+        messages.success(request, f'Statement sent to {", ".join(emails)}')
         return redirect('monthly_report')

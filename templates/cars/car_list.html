@@ -1,5 +1,41 @@
 {% extends 'base.html' %}
 {% block title %}Cars - AutoPro{% endblock %}
+
+{% block scripts %}
+<script>
+const vinInput = document.getElementById('vin-search');
+const vinSuggestions = document.getElementById('vin-suggestions');
+
+vinInput.addEventListener('input', function() {
+    const q = this.value.trim();
+    if (q.length < 2) { vinSuggestions.style.display = 'none'; return; }
+    fetch(`/cars/search/vin/?q=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(data => {
+            vinSuggestions.innerHTML = '';
+            if (!data.results.length) { vinSuggestions.style.display = 'none'; return; }
+            data.results.forEach(c => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'list-group-item list-group-item-action';
+                item.innerHTML = `<strong>${c.vin}</strong> — ${c.make} ${c.model} <small class="text-muted">${c.customer}</small>`;
+                item.addEventListener('click', function() {
+                    vinInput.value = c.vin;
+                    vinSuggestions.style.display = 'none';
+                });
+                vinSuggestions.appendChild(item);
+            });
+            vinSuggestions.style.display = 'block';
+        });
+});
+
+document.addEventListener('click', function(e) {
+    if (!vinInput.contains(e.target) && !vinSuggestions.contains(e.target)) {
+        vinSuggestions.style.display = 'none';
+    }
+});
+</script>
+{% endblock %}
 {% block page_title %}Cars{% endblock %}
 {% block content %}
 
@@ -11,7 +47,10 @@
         </div>
         <div class="col-md-3">
             <label class="form-label">Search by VIN</label>
-            <input type="text" name="vin" class="form-control" placeholder="VIN number" value="{{ vin }}">
+            <div class="position-relative">
+                <input type="text" name="vin" id="vin-search" class="form-control" placeholder="VIN number" value="{{ vin }}" autocomplete="off">
+                <div id="vin-suggestions" class="list-group position-absolute w-100" style="z-index:1000;display:none;"></div>
+            </div>
         </div>
         <div class="col-md-3">
             <label class="form-label">Search by Stock #</label>
@@ -50,7 +89,7 @@
                     <td>{{ car.vin|default:'-' }}</td>
                     <td>
                         {% with last=car.get_last_invoice_date %}
-                        {% if last %}{{ last|date:"m/d/Y" }}{% else %}-{% endif %}
+                        {% if last %}{{ last|date:"N j, Y" }}{% else %}-{% endif %}
                         {% endwith %}
                     </td>
                     <td class="d-flex gap-1">

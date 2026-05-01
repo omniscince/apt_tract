@@ -1,3 +1,4 @@
+from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -11,10 +12,13 @@ from customers.models import Customer
 @method_decorator(login_required, name='dispatch')
 class CarListView(View):
     def get(self, request):
-        cars = Car.objects.all().select_related('customer')
         q = request.GET.get('q', '')
         vin = request.GET.get('vin', '')
         stock = request.GET.get('stock', '')
+        if request.user.role == 'staff' and not vin and not q and not stock:
+            cars = Car.objects.none()
+        else:
+            cars = Car.objects.all().select_related('customer')
         customer_id = request.GET.get('customer')
 
         if q:
@@ -122,3 +126,15 @@ class CarDeleteView(View):
         car.delete()
         messages.success(request, 'Car deleted')
         return redirect('car_list')
+
+@method_decorator(login_required, name='dispatch')
+class VINSearchView(View):
+    def get(self, request):
+        q = request.GET.get('q', '')
+        if len(q) >= 2:
+            from cars.models import Car
+            cars = Car.objects.filter(vin__icontains=q)[:10]
+            data = [{'vin': c.vin, 'make': c.make, 'model': c.model, 'stock': c.stock_number or '', 'customer': c.customer.name if c.customer else ''} for c in cars]
+        else:
+            data = []
+        return JsonResponse({'results': data})

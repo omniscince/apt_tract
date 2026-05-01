@@ -22,6 +22,8 @@ class InvoiceForm(forms.ModelForm):
             'class': 'form-control',
             'placeholder': 'Make (e.g. BMW)',
             'id': 'id_car_make',
+            'style': 'text-transform:uppercase;',
+            'oninput': 'this.value=this.value.toUpperCase()',
         }),
         label='Car Make'
     )
@@ -31,6 +33,8 @@ class InvoiceForm(forms.ModelForm):
             'class': 'form-control',
             'placeholder': 'Model (e.g. X5)',
             'id': 'id_car_model',
+            'style': 'text-transform:uppercase;',
+            'oninput': 'this.value=this.value.toUpperCase()',
         }),
         label='Car Model'
     )
@@ -55,6 +59,16 @@ class InvoiceForm(forms.ModelForm):
         label='Stock #'
     )
 
+    invoice_number_override = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'e.g. 2026-000005',
+            'id': 'id_invoice_number_override',
+        }),
+        label='Invoice Number'
+    )
+
     class Meta:
         model = Invoice
         fields = [
@@ -71,21 +85,34 @@ class InvoiceForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         today = timezone.now().date()
         if not self.instance.pk:
             self.fields['invoice_date'].initial = today
             self.fields['due_date'].initial = today + relativedelta(months=1)
+            self.fields['last_edit_date'].initial = today
+        if self.user and self.user.role == 'staff':
+            self.fields['work_completed_by'].disabled = True
+            self.fields['work_completed_by'].initial = self.user
+
+    def clean_due_date(self):
+        due_date = self.cleaned_data.get('due_date')
+        invoice_date = self.cleaned_data.get('invoice_date')
+        if not due_date and invoice_date:
+            return invoice_date + relativedelta(months=1)
+        return due_date
 
         if self.instance and self.instance.pk:
-            self.fields['customer_name'].initial = self.instance.get_customer_display()
+            self.initial['customer_name'] = self.instance.get_customer_display()
+            self.initial['invoice_number_override'] = self.instance.invoice_number
             if self.instance.car:
-                self.fields['car_make'].initial = self.instance.car.make
-                self.fields['car_model'].initial = self.instance.car.model
-                self.fields['car_vin'].initial = self.instance.car.vin
-                self.fields['car_stock'].initial = self.instance.car.stock_number
+                self.initial['car_make'] = self.instance.car.make
+                self.initial['car_model'] = self.instance.car.model
+                self.initial['car_vin'] = self.instance.car.vin
+                self.initial['car_stock'] = self.instance.car.stock_number
             elif self.instance.car_info:
-                self.fields['car_make'].initial = self.instance.car_info
+                self.initial['car_make'] = self.instance.car_info
 
     def clean_car_vin(self):
         vin = self.cleaned_data.get('car_vin', '').strip()
@@ -101,7 +128,8 @@ class InvoiceItemForm(forms.ModelForm):
         widgets = {
             'description': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Service description'
+                'placeholder': 'Service description',
+                'autocomplete': 'off'
             }),
             'price': forms.NumberInput(attrs={
                 'class': 'form-control',

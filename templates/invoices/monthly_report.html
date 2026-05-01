@@ -1,42 +1,95 @@
 {% extends 'base.html' %}
-{% block title %}Monthly Report - AutoPro{% endblock %}
-{% block page_title %}Monthly Report{% endblock %}
+{% block title %}Report - AutoPro{% endblock %}
+
+{% block scripts %}
+<script>
+const vinInput = document.getElementById('vin-search-report');
+const vinSuggestions = document.getElementById('vin-suggestions-report');
+
+vinInput.addEventListener('input', function() {
+    const q = this.value.trim();
+    if (q.length < 2) { vinSuggestions.style.display = 'none'; return; }
+    fetch(`/cars/search/vin/?q=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(data => {
+            vinSuggestions.innerHTML = '';
+            if (!data.results.length) { vinSuggestions.style.display = 'none'; return; }
+            data.results.forEach(c => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'list-group-item list-group-item-action';
+                item.innerHTML = `<strong>${c.vin}</strong> — ${c.make} ${c.model} <small class="text-muted">${c.customer}</small>`;
+                item.addEventListener('click', function() {
+                    vinInput.value = c.vin;
+                    vinSuggestions.style.display = 'none';
+                });
+                vinSuggestions.appendChild(item);
+            });
+            vinSuggestions.style.display = 'block';
+        });
+});
+
+document.addEventListener('click', function(e) {
+    if (!vinInput.contains(e.target) && !vinSuggestions.contains(e.target)) {
+        vinSuggestions.style.display = 'none';
+    }
+});
+</script>
+{% endblock %}
+{% block page_title %}Report{% endblock %}
 {% block content %}
+
 <div class="card p-4 mb-4">
     <form method="get" class="row g-3 align-items-end">
-        <div class="col-md-4">
+        <div class="col-md-3">
             <label class="form-label">Customer</label>
-            <select name="customer" class="form-control" required>
-                <option value="">Select Customer</option>
+            <select name="customer" class="form-control">
+                <option value="">All Customers</option>
                 {% for c in customers %}
-                <option value="{{ c.pk }}" {% if selected_customer and selected_customer.pk == c.pk %}selected{% endif %}>{{ c.name }}</option>
+                <option value="{{ c.pk }}" {% if request.GET.customer == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
                 {% endfor %}
             </select>
         </div>
         <div class="col-md-2">
+            <label class="form-label">Staff</label>
+            <select name="staff" class="form-control">
+                <option value="">All Staff</option>
+                {% for s in staff_list %}
+                <option value="{{ s.pk }}" {% if request.GET.staff == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.get_full_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">VIN</label>
+            <div class="position-relative">
+                <input type="text" name="vin" id="vin-search-report" class="form-control" placeholder="VIN number" value="{{ request.GET.vin }}" autocomplete="off">
+                <div id="vin-suggestions-report" class="list-group position-absolute w-100" style="z-index:1000;display:none;"></div>
+            </div>
+        </div>
+        <div class="col-md-1">
             <label class="form-label">Month</label>
-            <input type="number" name="month" class="form-control" value="{{ month }}" min="1" max="12">
+            <input type="number" name="month" class="form-control" value="{{ request.GET.month }}" min="1" max="12" placeholder="All">
         </div>
-        <div class="col-md-2">
+        <div class="col-md-1">
             <label class="form-label">Year</label>
-            <input type="number" name="year" class="form-control" value="{{ year }}">
+            <input type="number" name="year" class="form-control" value="{{ request.GET.year }}" placeholder="All">
         </div>
-        <div class="col-md-2">
-            <button type="submit" class="btn btn-primary w-100">Generate</button>
+        <div class="col-md-3">
+            <label class="form-label">Date Range</label>
+            <div class="d-flex gap-1">
+                <input type="date" name="date_from" class="form-control" value="{{ request.GET.date_from }}">
+                <input type="date" name="date_to" class="form-control" value="{{ request.GET.date_to }}">
+            </div>
         </div>
-        {% if selected_customer and invoices %}
-        <div class="col-md-2">
-            <a href="{% url 'monthly_report_pdf' %}?customer={{ selected_customer.pk }}&month={{ month }}&year={{ year }}"
-               class="btn btn-success w-100">
-                <i class="bi bi-file-pdf"></i> PDF
-            </a>
+        <div class="col-md-12 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Filter</button>
+            <a href="{% url 'monthly_report' %}" class="btn btn-outline-secondary">Reset</a>
+            <a href="{% url 'monthly_report_pdf' %}?{{ request.GET.urlencode }}" class="btn btn-success">Download Statement</a>
         </div>
-        {% endif %}
     </form>
 </div>
 
-{% if selected_customer %}
-<h5>{{ selected_customer.name }} — Month {{ month }}/{{ year }}</h5>
+{% if invoices %}
 <div class="card">
     <div class="table-responsive">
         <table class="table table-hover mb-0">
@@ -44,7 +97,9 @@
                 <tr>
                     <th>Invoice #</th>
                     <th>Date</th>
+                    <th>Customer</th>
                     <th>Car</th>
+                    <th>Work Completed By</th>
                     <th>Services</th>
                     <th class="text-end">Total</th>
                 </tr>
@@ -53,8 +108,10 @@
                 {% for inv in invoices %}
                 <tr>
                     <td><a href="{% url 'invoice_detail' inv.pk %}">{{ inv.invoice_number }}</a></td>
-                    <td>{{ inv.invoice_date|date:"m/d/Y" }}</td>
-                    <td>{{ inv.car.make }} {{ inv.car.model }}</td>
+                    <td>{{ inv.invoice_date|date:"N j, Y" }}</td>
+                    <td>{{ inv.get_customer_display }}</td>
+                    <td>{{ inv.get_car_display }}</td>
+                    <td>{{ inv.work_completed_by.get_full_name|default:"-" }}</td>
                     <td>
                         {% for item in inv.items.all %}
                         <small class="d-block">{{ item.description }} — ${{ item.price }}</small>
@@ -62,20 +119,20 @@
                     </td>
                     <td class="text-end"><strong>${{ inv.total }}</strong></td>
                 </tr>
-                {% empty %}
-                <tr><td colspan="5" class="text-center text-muted py-4">No invoices for this period</td></tr>
                 {% endfor %}
             </tbody>
-            {% if invoices %}
             <tfoot class="table-dark">
                 <tr>
-                    <td colspan="4" class="text-end"><strong>Total Due:</strong></td>
+                    <td colspan="6" class="text-end"><strong>Total:</strong></td>
                     <td class="text-end"><strong>${{ total }}</strong></td>
                 </tr>
             </tfoot>
-            {% endif %}
         </table>
     </div>
+</div>
+{% else %}
+<div class="text-center text-muted py-5">
+    <p>No invoices found. Use filters above to search.</p>
 </div>
 {% endif %}
 {% endblock %}

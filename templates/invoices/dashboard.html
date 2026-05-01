@@ -23,7 +23,7 @@
                 <tr>
                     <td><strong>{{ inv.invoice_number }}</strong></td>
                     <td>{{ inv.car.make }} {{ inv.car.model }}</td>
-                    <td>{{ inv.invoice_date|date:"m/d/Y" }}</td>
+                    <td>{{ inv.invoice_date|date:"N j, Y" }}</td>
                     <td>${{ inv.total }}</td>
                     <td><span class="badge bg-success">{{ inv.status|upper }}</span></td>
                     <td>
@@ -83,7 +83,7 @@
                     <td><strong>{{ inv.invoice_number }}</strong></td>
                     <td>{{ inv.customer.name }}</td>
                     <td>{{ inv.car.make }} {{ inv.car.model }}</td>
-                    <td>{{ inv.invoice_date|date:"m/d/Y" }}</td>
+                    <td>{{ inv.invoice_date|date:"N j, Y" }}</td>
                     <td>${{ inv.total }}</td>
                     <td><span class="badge bg-success">{{ inv.status|upper }}</span></td>
                     <td>

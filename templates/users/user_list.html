@@ -35,14 +35,14 @@
                         <span class="badge bg-danger">Inactive</span>
                         {% endif %}
                     </td>
-                    <td>
+                    <td class="d-flex gap-1">
+                        <a href="{% url 'invoice_list' %}?staff={{ u.pk }}" class="btn btn-sm btn-outline-secondary">👁 Invoices</a>
+                        <a href="{% url 'user_edit' u.pk %}" class="btn btn-sm btn-outline-primary">✏️</a>
                         {% if u != request.user %}
                         <form method="post" action="{% url 'user_delete' u.pk %}" class="d-inline"
                               onsubmit="return confirm('Delete this user?')">
                             {% csrf_token %}
-                            <button class="btn btn-sm btn-outline-danger">
-                                <i class="bi bi-trash"></i>
-                            </button>
+                            <button class="btn btn-sm btn-outline-danger">🗑</button>
                         </form>
                         {% endif %}
                     </td>

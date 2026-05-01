@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Django
+db.sqlite3
+db_dev.sqlite3
+staticfiles/
+*.log
+
+# Env
+.env
+*.env
+
+# Scripts
+get-pip.py
+import_customers.py

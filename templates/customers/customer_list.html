@@ -2,44 +2,85 @@
 {% block title %}Customers - AutoPro{% endblock %}
 {% block page_title %}Customers{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h4>All Customers</h4>
-    {% if user.role in 'owner,staff,accountant' %}
-    <a href="{% url 'customer_create' %}" class="btn btn-primary">
-        <i class="bi bi-plus"></i> Add Customer
-    </a>
-    {% endif %}
+<div class="card p-3 mb-4">
+    <form method="get" class="row g-2 align-items-end">
+        <div class="col-md-8">
+            <label class="form-label">Search by Name / Company</label>
+            <input type="text" name="q" class="form-control" placeholder="e.g. John Smith" value="{{ q }}">
+        </div>
+        <div class="col-md-4 d-flex gap-2 align-items-end">
+            <button type="submit" class="btn btn-primary">Search</button>
+            <a href="{% url 'customer_list' %}" class="btn btn-outline-secondary">Reset</a>
+            {% if user.role == 'owner' %}
+            <a href="{% url 'customer_create' %}" class="btn btn-success ms-auto">+ Add Customer</a>
+            {% endif %}
+        </div>
+    </form>
 </div>
 <div class="card">
     <div class="table-responsive">
         <table class="table table-hover mb-0">
             <thead class="table-light">
-                <tr><th>Name</th><th>Phone</th><th>Email</th><th>City</th><th>Cars</th><th></th></tr>
+                <tr>
+                    <th>Name</th>
+                    <th>Company</th>
+                    <th>Phone</th>
+                    <th>Email</th>
+                    <th>City</th>
+                    <th>Cars</th>
+                    <th></th>
+                </tr>
             </thead>
             <tbody>
                 {% for c in customers %}
                 <tr>
                     <td><strong>{{ c.name }}</strong></td>
+                    <td>{{ c.company|default:'-' }}</td>
                     <td>{{ c.phone|default:'-' }}</td>
-                    <td>{{ c.email|default:'-' }}</td>
+                    <td>
+                        {% for email in c.emails.all %}
+                        <small class="d-block">{{ email.email }}{% if email.is_primary %} ⭐{% endif %}</small>
+                        {% empty %}-{% endfor %}
+                    </td>
                     <td>{{ c.city|default:'-' }}</td>
                     <td>{{ c.cars.count }}</td>
-                    <td>
-                        <a href="{% url 'customer_detail' c.pk %}" class="btn btn-sm btn-outline-primary">
-                            <i class="bi bi-eye"></i>
-                        </a>
-                        {% if user.role in 'owner,staff,accountant' %}
-                        <a href="{% url 'customer_edit' c.pk %}" class="btn btn-sm btn-outline-secondary">
-                            <i class="bi bi-pencil"></i>
-                        </a>
+                    <td class="d-flex gap-1">
+                        <a href="{% url 'customer_detail' c.pk %}" class="btn btn-sm btn-outline-secondary">👁</a>
+                        {% if user.role == 'owner' %}
+                        <a href="{% url 'customer_edit' c.pk %}" class="btn btn-sm btn-outline-primary">✏️</a>
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="showDeleteModal({{ c.pk }}, '{{ c.name|escapejs }}')">🗑</button>
                         {% endif %}
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6" class="text-center text-muted py-4">No customers yet</td></tr>
+                <tr><td colspan="7" class="text-center text-muted py-4">No customers found</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+
+<div id="delete-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
+    <div class="card p-4" style="max-width:400px;width:90%;">
+        <h5>Delete Customer</h5>
+        <p>Are you sure you want to delete <strong id="delete-name"></strong>?</p>
+        <div class="d-flex gap-2 justify-content-end">
+            <button class="btn btn-outline-secondary" onclick="document.getElementById('delete-modal').style.display='none'">Cancel</button>
+            <form id="delete-form" method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">Delete</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showDeleteModal(pk, name) {
+    document.getElementById('delete-name').textContent = name;
+    document.getElementById('delete-form').action = '/customers/' + pk + '/delete/';
+    document.getElementById('delete-modal').style.display = 'flex';
+}
+</script>
 {% endblock %}
