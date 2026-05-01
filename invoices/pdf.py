@@ -37,7 +37,7 @@ def generate_invoice_pdf(response, invoice):
     story = []
 
     bold_style = ParagraphStyle('Bold', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10)
-    company_style = ParagraphStyle('CompanyName', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=15, spaceAfter=0, spaceBefore=0, leading=18)
+    company_style = ParagraphStyle('CompanyName', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=13, spaceAfter=0, spaceBefore=0, leading=15)
     normal_style = ParagraphStyle('Normal2', parent=styles['Normal'], fontSize=9)
     small_style = ParagraphStyle('Small', parent=styles['Normal'], fontSize=8)
     title_style = ParagraphStyle('Title2', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=16, alignment=TA_CENTER)
@@ -248,7 +248,6 @@ def generate_monthly_report_pdf(response, invoices, customer=None):
     right_style = ParagraphStyle('Right', parent=styles['Normal'], fontSize=9, alignment=TA_RIGHT)
     right_bold = ParagraphStyle('RightBold', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, alignment=TA_RIGHT)
     company_style = ParagraphStyle('CompanyName', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=13, spaceAfter=0, spaceBefore=0, leading=13)
-
     logo_path = get_logo()
     if logo_path:
         logo = Image(logo_path, width=1.8*inch, height=0.7*inch)
@@ -261,24 +260,29 @@ def generate_monthly_report_pdf(response, invoices, customer=None):
     story.append(Spacer(1, 0.15*inch))
 
     # Header: company left, logo right
+    # Header: company left, logo right
     header_data = [
-        [Paragraph(f"<b>{COMPANY_NAME}</b>", company_style), logo_cell],
-        [Paragraph(COMPANY_ADDRESS, normal_style), ''],
-        [Paragraph(COMPANY_CITY, normal_style), ''],
-        [Paragraph(COMPANY_PHONE, normal_style), ''],
-        [Paragraph(COMPANY_EMAIL, normal_style), ''],
-        [Paragraph(COMPANY_HST, normal_style), ''],
+        [Paragraph(
+            f"<b>{COMPANY_NAME}</b><br/>"
+            f"<font name='Helvetica' size='9'>{COMPANY_ADDRESS}<br/>"
+            f"{COMPANY_CITY}<br/>"
+            f"{COMPANY_PHONE}<br/>"
+            f"{COMPANY_EMAIL}<br/>"
+            f"{COMPANY_HST}</font>",
+            ParagraphStyle('Co', parent=styles['Normal'], fontSize=13, leading=14, spaceAfter=0, spaceBefore=0)),
+            logo_cell],
     ]
-    header_table = Table(header_data, colWidths=[4*inch, 3.5*inch])
+    header_table = Table(header_data, colWidths=[4 * inch, 3.5 * inch])
     header_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
-        ('BOTTOMPADDING', (0, 0), (0, 0), 1),
-        ('BOTTOMPADDING', (0, 1), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (0, 0), 0),
         ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING', (0, 1), (0, 1), 0),
     ]))
     story.append(header_table)
-    story.append(Spacer(1, 0.15*inch))
+    story.append(Spacer(1, 0.15 * inch))
 
     # Billing address + statement date
     now_str = timezone.now().strftime('%m/%d/%Y %I:%M %p')
@@ -313,7 +317,7 @@ def generate_monthly_report_pdf(response, invoices, customer=None):
 
     # Invoice table — full width 7.5 inch
     total_width = 7.5*inch
-    col_widths = [1.6*inch, 1.0*inch, 1.0*inch, 1.0*inch, 0.97*inch, 0.97*inch, 0.97*inch]
+    col_widths = [1.55*inch, 1.0*inch, 1.0*inch, 1.0*inch, 0.95*inch, 0.95*inch, 1.05*inch]
     table_data = [[
         Paragraph('<b>Invoice Number</b>', bold_style2),
         Paragraph('<b>Invoice Date</b>', bold_style2),

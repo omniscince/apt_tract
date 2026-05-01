@@ -29,4 +29,4 @@ class CarForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.pk and self.instance.customer:
-            self.fields['customer_name'].initial = self.instance.customer.name
+            self.fields['customer_name'].initial = self.instance.customer.name  

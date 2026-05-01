@@ -491,3 +491,15 @@ class SendStatementView(View):
         threading.Thread(target=send_statement, daemon=True).start()
         messages.success(request, f'Statement sent to {", ".join(emails)}')
         return redirect('monthly_report')
+
+@method_decorator(login_required, name='dispatch')
+class StatementPreviewView(View):
+    def get(self, request):
+        customer_id = request.GET.get('customer')
+        from customers.models import Customer as C
+        customer = C.objects.filter(pk=customer_id).first() if customer_id else None
+        invoices = Invoice.objects.filter(customer=customer) if customer else Invoice.objects.all()[:5]
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = 'inline; filename="preview.pdf"'
+        generate_monthly_report_pdf(response, invoices, customer=customer)
+        return response
