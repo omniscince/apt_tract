@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% block title %}Cars - AutoPro{% endblock %}
+
+{% block scripts %}
+<script>
+const vinInput = document.getElementById('vin-search');
+const vinSuggestions = document.getElementById('vin-suggestions');
+
+vinInput.addEventListener('input', function() {
+    const q = this.value.trim();
+    if (q.length < 2) { vinSuggestions.style.display = 'none'; return; }
+    fetch(`/cars/search/vin/?q=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(data => {
+            vinSuggestions.innerHTML = '';
+            if (!data.results.length) { vinSuggestions.style.display = 'none'; return; }
+            data.results.forEach(c => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'list-group-item list-group-item-action';
+                item.innerHTML = `<strong>${c.vin}</strong> — ${c.make} ${c.model} <small class="text-muted">${c.customer}</small>`;
+                item.addEventListener('click', function() {
+                    vinInput.value = c.vin;
+                    vinSuggestions.style.display = 'none';
+                });
+                vinSuggestions.appendChild(item);
+            });
+            vinSuggestions.style.display = 'block';
+        });
+});
+
+document.addEventListener('click', function(e) {
+    if (!vinInput.contains(e.target) && !vinSuggestions.contains(e.target)) {
+        vinSuggestions.style.display = 'none';
+    }
+});
+</script>
+{% endblock %}
+{% block page_title %}Cars{% endblock %}
+{% block content %}
+
+<div class="card p-3 mb-4">
+    <form method="get" class="row g-2 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label">Search by Customer</label>
+            <input type="text" name="q" class="form-control" placeholder="Customer name" value="{{ q }}">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Search by VIN</label>
+            <div class="position-relative">
+                <input type="text" name="vin" id="vin-search" class="form-control" placeholder="VIN number" value="{{ vin }}" autocomplete="off">
+                <div id="vin-suggestions" class="list-group position-absolute w-100" style="z-index:1000;display:none;"></div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Search by Stock #</label>
+            <input type="text" name="stock" class="form-control" placeholder="Stock number" value="{{ stock }}">
+        </div>
+        <div class="col-md-3 d-flex gap-2 align-items-end">
+            <button type="submit" class="btn btn-primary">Search</button>
+            <a href="{% url 'car_list' %}" class="btn btn-outline-secondary">Reset</a>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Customer</th>
+                    <th>Make</th>
+                    <th>Model</th>
+                    <th>Year</th>
+                    <th>Stock#</th>
+                    <th>VIN</th>
+                    <th>Last Invoice</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for car in cars %}
+                <tr>
+                    <td>{{ car.customer.name }}</td>
+                    <td>{{ car.make }}</td>
+                    <td>{{ car.model }}</td>
+                    <td>{{ car.year|default:'-' }}</td>
+                    <td>{{ car.stock_number|default:'-' }}</td>
+                    <td>{{ car.vin|default:'-' }}</td>
+                    <td>
+                        {% with last=car.get_last_invoice_date %}
+                        {% if last %}{{ last|date:"N j, Y" }}{% else %}-{% endif %}
+                        {% endwith %}
+                    </td>
+                    <td class="d-flex gap-1">
+                        <a href="{% url 'car_detail' car.pk %}" class="btn btn-sm btn-outline-secondary">👁</a>
+                        <a href="{% url 'car_edit' car.pk %}" class="btn btn-sm btn-outline-primary">✏️</a>
+                        <form method="post" action="{% url 'car_delete' car.pk %}" class="d-inline"
+                              onsubmit="return confirm('Delete this car?')">
+                            {% csrf_token %}
+                            <button class="btn btn-sm btn-outline-danger">🗑</button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" class="text-center text-muted py-4">No cars found</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

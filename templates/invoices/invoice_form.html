@@ -1,5 +1,32 @@
 {% extends 'base.html' %}
-{% block title %}{{ title }} - AutoPro{% endblock %}
+{% block title %}{{ title }} - AutoPro<script>
+// Uppercase: stock, services
+function applyUppercase(el) {
+    el.style.textTransform = 'uppercase';
+    el.addEventListener('input', function() {
+        var pos = this.selectionStart;
+        this.value = this.value.toUpperCase();
+        this.setSelectionRange(pos, pos);
+    });
+}
+document.addEventListener('DOMContentLoaded', function() {
+    var stock = document.getElementById('id_car_stock');
+    var vin = document.getElementById('id_car_vin');
+    if (vin) applyUppercase(vin);
+    if (stock) applyUppercase(stock);
+    document.querySelectorAll('[name$="-description"]').forEach(applyUppercase);
+    var observer = new MutationObserver(function() {
+        document.querySelectorAll('[name$="-description"]').forEach(function(el) {
+            if (!el.dataset.upper) {
+                el.dataset.upper = '1';
+                applyUppercase(el);
+            }
+        });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+});
+</script>
+{% endblock %}
 {% block page_title %}{{ title }}{% endblock %}
 {% block content %}
 <div class="card p-4">
@@ -20,7 +47,7 @@
             <div class="col-md-4">
                 <label class="form-label fw-bold">VIN <small class="text-muted">(min 8 chars)</small></label>
                 {{ form.car_vin }}
-                <div id="vin-error" class="text-danger small mt-1" style="display:none;">VIN must be at least 8 characters</div>
+                <div id="vin-error" class="text-danger small mt-1" style="display:none;">VIN Number!!!</div>
             </div>
             <div class="col-md-4">
                 <label class="form-label fw-bold">Car Make *</label>
@@ -48,6 +75,14 @@
                 <label class="form-label">Last Edit Date</label>
                 {{ form.last_edit_date }}
             </div>
+
+            <!-- Invoice number override (owner only) -->
+            {% if request.user.role == 'owner' %}
+            <div class="col-md-6">
+                <label class="form-label">Invoice Number <small class="text-muted">(leave blank for auto)</small></label>
+                {{ form.invoice_number_override }}
+            </div>
+            {% endif %}
 
             <!-- Other fields -->
             <div class="col-md-6">
@@ -135,14 +170,6 @@ customerInput.addEventListener('input', function() {
                 item.addEventListener('click', function() {
                     customerInput.value = c.name;
                     suggestions.style.display = 'none';
-                    if (c.cars && c.cars.length > 0) {
-                        const car = c.cars[0];
-                        document.getElementById('id_car_make').value = car.make || '';
-                        document.getElementById('id_car_model').value = car.model || '';
-                        document.getElementById('id_car_vin').value = car.vin || '';
-                        document.getElementById('id_car_stock').value = car.stock || '';
-                        validateVin();
-                    }
                 });
                 suggestions.appendChild(item);
             });
@@ -153,6 +180,81 @@ customerInput.addEventListener('input', function() {
 document.addEventListener('click', function(e) {
     if (!customerInput.contains(e.target) && !suggestions.contains(e.target)) {
         suggestions.style.display = 'none';
+    }
+});
+
+// Field order enforcement: customer → VIN → make → model → rest
+const fields = {
+    vin: document.getElementById('id_car_vin'),
+    make: document.getElementById('id_car_make'),
+    model: document.getElementById('id_car_model'),
+};
+
+function lockField(field) {
+    field.disabled = true;
+    field.style.backgroundColor = '#f0f0f0';
+    field.style.cursor = 'not-allowed';
+}
+
+function unlockField(field) {
+    field.disabled = false;
+    field.style.backgroundColor = '';
+    field.style.cursor = '';
+}
+
+// Initially lock make, model only for new invoices
+const isEditMode = window.location.href.includes('/edit/');
+if (!isEditMode) {
+    lockField(fields.vin);
+    lockField(fields.make);
+    lockField(fields.model);
+}
+
+// Unlock VIN when customer is selected
+customerInput.addEventListener('input', function() {
+    if (this.value.trim().length > 0) {
+        unlockField(fields.vin);
+    } else {
+        lockField(fields.vin);
+        lockField(fields.make);
+        lockField(fields.model);
+    }
+});
+
+// Unlock make when VIN has 8+ chars
+fields.vin.addEventListener('input', function() {
+    if (this.value.trim().length >= 8) {
+        unlockField(fields.make);
+    } else {
+        lockField(fields.make);
+        lockField(fields.model);
+        fields.make.value = '';
+        fields.model.value = '';
+    }
+});
+
+// Unlock model when make is filled
+fields.make.addEventListener('input', function() {
+    if (this.value.trim().length > 0) {
+        unlockField(fields.model);
+    } else {
+        lockField(fields.model);
+        fields.model.value = '';
+    }
+});
+
+// Auto due date +1 month from invoice date
+const invoiceDateInput = document.getElementById('id_invoice_date');
+const dueDateInput = document.getElementById('id_due_date');
+
+invoiceDateInput.addEventListener('change', function() {
+    const invoiceDate = new Date(this.value);
+    if (!isNaN(invoiceDate)) {
+        invoiceDate.setMonth(invoiceDate.getMonth() + 1);
+        const y = invoiceDate.getFullYear();
+        const m = String(invoiceDate.getMonth() + 1).padStart(2, '0');
+        const d = String(invoiceDate.getDate()).padStart(2, '0');
+        dueDateInput.value = `${y}-${m}-${d}`;
     }
 });
 
@@ -175,10 +277,40 @@ vinInput.addEventListener('input', validateVin);
 
 // Form submit validation
 document.getElementById('invoice-form').addEventListener('submit', function(e) {
+    let valid = true;
+
+    // VIN validation
     if (!validateVin()) {
-        e.preventDefault();
+        valid = false;
         vinInput.focus();
     }
+
+    // Customer validation
+    if (!customerInput.value.trim()) {
+        valid = false;
+        customerInput.style.border = '2px solid red';
+        customerInput.focus();
+    } else {
+        customerInput.style.border = '';
+    }
+
+    // Services validation - at least one service with description and price
+    const descriptions = document.querySelectorAll('[name$="-description"]');
+    const prices = document.querySelectorAll('[name$="-price"]');
+    let hasService = false;
+    descriptions.forEach((desc, i) => {
+        const deleteCheckbox = document.querySelector(`[name="items-${i}-DELETE"]`);
+        const isDeleted = deleteCheckbox && deleteCheckbox.checked;
+        if (!isDeleted && desc.value.trim() && prices[i] && parseFloat(prices[i].value) > 0) {
+            hasService = true;
+        }
+    });
+    if (!hasService) {
+        valid = false;
+        alert('Please add at least one service with description and price.');
+    }
+
+    if (!valid) e.preventDefault();
 });
 
 // Add service row
@@ -190,7 +322,7 @@ document.getElementById('add-row').addEventListener('click', function() {
     newRow.className = 'row g-2 mb-2 formset-row';
     newRow.innerHTML = `
         <div class="col-md-8">
-            <input type="text" name="items-${formNum}-description" class="form-control" placeholder="Service description">
+            <input type="text" name="items-${formNum}-description" class="form-control" placeholder="Service description" autocomplete="off">
             <input type="hidden" name="items-${formNum}-id" value="">
         </div>
         <div class="col-md-3">
@@ -202,6 +334,35 @@ document.getElementById('add-row').addEventListener('click', function() {
     `;
     container.appendChild(newRow);
     totalForms.value = formNum + 1;
+});
+</script>
+<script>
+function applyUppercase(el) {
+    el.style.textTransform = 'uppercase';
+    el.addEventListener('input', function() {
+        var pos = this.selectionStart;
+        this.value = this.value.toUpperCase();
+        this.setSelectionRange(pos, pos);
+    });
+}
+document.addEventListener('DOMContentLoaded', function() {
+    var stock = document.getElementById('id_car_stock');
+    var vin = document.getElementById('id_car_vin');
+    if (vin) applyUppercase(vin);
+    if (stock) applyUppercase(stock);
+    document.querySelectorAll('[name$="-description"]').forEach(function(el) {
+        el.dataset.upper = '1';
+        applyUppercase(el);
+    });
+    var observer = new MutationObserver(function() {
+        document.querySelectorAll('[name$="-description"]').forEach(function(el) {
+            if (!el.dataset.upper) {
+                el.dataset.upper = '1';
+                applyUppercase(el);
+            }
+        });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
 });
 </script>
 {% endblock %}

@@ -53,6 +53,7 @@
         <div class="col-md-12 d-flex gap-2">
             <button type="submit" class="btn btn-primary">Filter</button>
             <a href="{% url 'invoice_list' %}" class="btn btn-outline-secondary">Reset</a>
+
             <a href="{% url 'invoice_create' %}" class="btn btn-success ms-auto">+ New Invoice</a>
         </div>
     </form>
@@ -69,7 +70,8 @@
                     <th>Date</th>
                     <th class="text-end">Subtotal</th>
                     <th class="text-end">Total</th>
-                    <th>Created By</th>
+                    <th>Work Completed By</th>
+                    <th>Sent</th>
                     <th>Status</th>
                     <th></th>
                 </tr>
@@ -80,10 +82,11 @@
                     <td><strong>{{ inv.invoice_number }}</strong></td>
                     <td>{{ inv.get_customer_display }}</td>
                     <td>{{ inv.get_car_display|truncatechars:25 }}</td>
-                    <td>{{ inv.invoice_date|date:"m/d/Y" }}</td>
+                    <td>{{ inv.invoice_date|date:"N j, Y" }}</td>
                     <td class="text-end">${{ inv.subtotal }}</td>
                     <td class="text-end"><strong>${{ inv.total }}</strong></td>
-                    <td>{{ inv.created_by.get_full_name|default:'-' }}</td>
+                    <td>{{ inv.work_completed_by.get_full_name|default:'-' }}</td>
+                     <td style='text-align:center;'>{% if inv.email_sent %}<span style='color:green;font-weight:bold;'>✓</span>{% else %}<span style='color:#ccc;'>–</span>{% endif %}</td>
                     <td>
                         {% if inv.status == 'final' %}
                         <span class="badge bg-success">Final</span>
@@ -93,8 +96,10 @@
                         <span class="badge bg-secondary">Draft</span>
                         {% endif %}
                     </td>
-                    <td>
+                    <td class="d-flex gap-1">
                         <a href="{% url 'invoice_detail' inv.pk %}" class="btn btn-sm btn-outline-secondary">👁</a>
+                        <a href="{% url 'invoice_edit' inv.pk %}" class="btn btn-sm btn-outline-primary">✏️</a>
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="showDeleteModal({{ inv.pk }}, '{{ inv.invoice_number }}')">🗑</button>
                     </td>
                 </tr>
                 {% empty %}
@@ -104,4 +109,51 @@
         </table>
     </div>
 </div>
+
+<div id="delete-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
+    <div class="card p-4" style="max-width:400px;width:90%;">
+        <h5>Delete Invoice</h5>
+        <p>Are you sure you want to delete invoice <strong id="delete-name"></strong>?</p>
+        <div class="d-flex gap-2 justify-content-end">
+            <button class="btn btn-outline-secondary" onclick="document.getElementById('delete-modal').style.display='none'">Cancel</button>
+            <form id="delete-form" method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">Delete</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showDeleteModal(pk, name) {
+    document.getElementById('delete-name').textContent = name;
+    document.getElementById('delete-form').action = '/invoices/' + pk + '/delete/';
+    document.getElementById('delete-modal').style.display = 'flex';
+}
+
+// Save/restore filters
+const filterKey = 'invoice_filters';
+const form = document.querySelector('form[method="get"]');
+
+if (!window.location.search) {
+    const saved = localStorage.getItem(filterKey);
+    if (saved) {
+        window.location.search = saved;
+    }
+}
+
+if (form) {
+    form.addEventListener('submit', function() {
+        const params = new URLSearchParams(new FormData(form));
+        localStorage.setItem(filterKey, params.toString());
+    });
+}
+
+document.querySelector('a[href$="invoices/"]') && document.querySelector('a[href$="invoices/"]').addEventListener('click', function() {
+    localStorage.removeItem(filterKey);
+});
+</script>
 {% endblock %}
