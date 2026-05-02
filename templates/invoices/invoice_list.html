@@ -71,6 +71,7 @@
                     <th class="text-end">Subtotal</th>
                     <th class="text-end">Total</th>
                     <th>Work Completed By</th>
+                    <th>Sent</th>
                     <th>Status</th>
                     <th></th>
                 </tr>
@@ -85,6 +86,7 @@
                     <td class="text-end">${{ inv.subtotal }}</td>
                     <td class="text-end"><strong>${{ inv.total }}</strong></td>
                     <td>{{ inv.work_completed_by.get_full_name|default:'-' }}</td>
+                     <td style='text-align:center;'>{% if inv.email_sent %}<span style='color:green;font-weight:bold;'>✓</span>{% else %}<span style='color:#ccc;'>–</span>{% endif %}</td>
                     <td>
                         {% if inv.status == 'final' %}
                         <span class="badge bg-success">Final</span>

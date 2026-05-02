@@ -309,4 +309,33 @@ document.getElementById('add-row').addEventListener('click', function() {
     totalForms.value = formNum + 1;
 });
 </script>
+<script>
+function applyUppercase(el) {
+    el.style.textTransform = 'uppercase';
+    el.addEventListener('input', function() {
+        var pos = this.selectionStart;
+        this.value = this.value.toUpperCase();
+        this.setSelectionRange(pos, pos);
+    });
+}
+document.addEventListener('DOMContentLoaded', function() {
+    var vin = document.getElementById('id_car_vin');
+    if (vin) applyUppercase(vin);
+    var stock = document.getElementById('id_car_stock');
+    if (stock) applyUppercase(stock);
+    document.querySelectorAll('[name$="-description"]').forEach(function(el) {
+        el.dataset.upper = '1';
+        applyUppercase(el);
+    });
+    var observer = new MutationObserver(function() {
+        document.querySelectorAll('[name$="-description"]').forEach(function(el) {
+            if (!el.dataset.upper) {
+                el.dataset.upper = '1';
+                applyUppercase(el);
+            }
+        });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+});
+</script>
 {% endblock %}

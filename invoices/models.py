@@ -19,6 +19,7 @@ class Invoice(models.Model):
     car_info = models.CharField(max_length=200, blank=True)
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_invoices')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='final')
+    email_sent = models.BooleanField(default=False)
     invoice_date = models.DateField(default=timezone.now)
     due_date = models.DateField(blank=True, null=True)
     po_number = models.CharField(max_length=50, blank=True, default='')

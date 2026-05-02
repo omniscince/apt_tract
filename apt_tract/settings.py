@@ -129,10 +129,9 @@ HST_RATE = Decimal('0.00')
 
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 465
-EMAIL_USE_SSL = True
-EMAIL_USE_TLS = False
-EMAIL_HOST_USER = 'aptcrmsystem@gmail.com'
-EMAIL_HOST_PASSWORD = 'ffhgefbabisouijb'
-DEFAULT_FROM_EMAIL = 'aptcrmsystem@gmail.com'
+EMAIL_HOST = 'smtp.sendgrid.net'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'apikey'
+EMAIL_HOST_PASSWORD = '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'
+DEFAULT_FROM_EMAIL = 'autoprotinting@gmail.com'

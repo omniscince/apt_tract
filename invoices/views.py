@@ -168,7 +168,7 @@ class InvoiceListView(View):
         if customer_id:
             invoices = invoices.filter(customer_id=customer_id)
         if staff_id and user.role != 'staff':
-            invoices = invoices.filter(created_by_id=staff_id)
+            invoices = invoices.filter(work_completed_by_id=staff_id)
         if month:
             invoices = invoices.filter(invoice_date__month=month)
         if year:
@@ -205,6 +205,8 @@ class InvoiceCreateView(View):
         if form.is_valid() and formset.is_valid():
             invoice = form.save(commit=False)
             invoice.created_by = request.user
+            if not invoice.work_completed_by:
+                invoice.work_completed_by = request.user
             invoice.status = 'final'
             if request.user.role == 'owner':
                 num = form.cleaned_data.get('invoice_number_override', '').strip()
@@ -334,6 +336,7 @@ class InvoiceActionView(View):
 
             threading.Thread(target=send_email, daemon=True).start()
             invoice.status = 'final'
+            invoice.email_sent = True
             invoice.save()
             messages.success(request, f'Invoice sent to {", ".join(emails)}')
 
