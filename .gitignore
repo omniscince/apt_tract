@@ -17,3 +17,9 @@ staticfiles/
 # Scripts
 get-pip.py
 import_customers.py
+.env
+__pycache__/
+*.pyc
+staticfiles/
+db.sqlite3
+db.sqlite3.bak
