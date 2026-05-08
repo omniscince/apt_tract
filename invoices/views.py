@@ -380,6 +380,14 @@ class MonthlyReportView(View):
         date_to = request.GET.get('date_to')
         vin = request.GET.get('vin')
 
+        # --- base queryset ---
+        invoices = Invoice.objects.all().select_related('customer', 'car', 'created_by', 'work_completed_by')
+
+        if customer_id:
+            invoices = invoices.filter(customer_id=customer_id)
+        if vin:
+            invoices = invoices.filter(car__vin__icontains=vin)
+
         # --- staff filter ---
         staff_id = request.GET.get('staff', '')
         if staff_id:

@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 {% block title %}Home - AutoPro{% endblock %}
-{% block page_title %}Home{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
 {% block desktop_page_title %}Dashboard{% endblock %}
 
 {% block content %}
@@ -31,55 +31,97 @@
 </div>
 
 {% else %}
-<!-- STAFF / OWNER home grid — My Day and Sync removed -->
-<div class="home-grid">
-    <a href="{% url 'customer_list' %}" class="home-tile">
-        <i class="bi bi-person-fill"></i>
-        <span>Customers</span>
-    </a>
-    <a href="{% url 'invoice_list' %}" class="home-tile">
-        <i class="bi bi-envelope-fill"></i>
-        <span>Invoices</span>
-    </a>
-    {% if user.role in 'owner,accountant' %}
-    <a href="{% url 'monthly_report' %}" class="home-tile">
-        <i class="bi bi-pie-chart-fill"></i>
-        <span>Reports</span>
-    </a>
-    {% endif %}
+
+<!-- ── FILTERS ── -->
+<div style="background:#fff;border-bottom:1px solid var(--border);padding:12px 16px;">
+    <div class="seg-control" id="seg" style="margin-bottom:10px;">
+        <button onclick="setPeriod(this,'today')"  class="{% if period == 'today' %}active{% endif %}">Today</button>
+        <button onclick="setPeriod(this,'week')"   class="{% if period == 'week' %}active{% endif %}">This Week</button>
+        <button onclick="setPeriod(this,'month')"  class="{% if period == 'month' or not period %}active{% endif %}">This Month</button>
+        <button onclick="setPeriod(this,'custom')" class="{% if period == 'custom' %}active{% endif %}">Custom</button>
+    </div>
+
+    <div id="custom-dates" style="display:{% if period == 'custom' %}flex{% else %}none{% endif %};gap:8px;margin-bottom:10px;align-items:center;">
+        <input type="date" id="date-from" value="{{ date_from }}" class="form-control" style="flex:1;">
+        <span style="color:var(--muted);font-size:13px;">—</span>
+        <input type="date" id="date-to" value="{{ date_to }}" class="form-control" style="flex:1;">
+    </div>
+
     {% if user.role == 'owner' %}
-    <a href="{% url 'user_list' %}" class="home-tile">
-        <i class="bi bi-gear-fill"></i>
-        <span>Settings</span>
-    </a>
+    <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <select id="filter-customer" class="form-control" style="flex:1;font-size:13px;padding:6px 10px!important;">
+            <option value="">All Customers</option>
+            {% for c in customers %}
+            <option value="{{ c.pk }}" {% if selected_customer == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+        </select>
+        <select id="filter-staff" class="form-control" style="flex:1;font-size:13px;padding:6px 10px!important;">
+            <option value="">All Staff</option>
+            {% for s in staff_list %}
+            <option value="{{ s.pk }}" {% if selected_staff == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.get_full_name|default:s.email }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div style="display:flex;gap:8px;">
+        <button onclick="applyFilters()" class="ap-btn ap-btn-primary ap-btn-sm" style="padding:8px 24px;">
+            <i class="bi bi-funnel"></i> Filter
+        </button>
+        <a href="{% url 'dashboard' %}" class="ap-btn ap-btn-outline ap-btn-sm" style="padding:8px 24px;">Reset</a>
+    </div>
     {% endif %}
 </div>
 
-<!-- Stats (desktop) -->
-<div class="desktop-only" style="padding:0 28px 20px;">
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
-        <div class="ap-card ap-card-body" style="text-align:center;">
-            <div style="font-size:28px;font-weight:700;color:var(--brand);">{{ total_invoices }}</div>
-            <div style="font-size:12px;color:var(--muted);font-weight:600;">Total Invoices</div>
-        </div>
-        <div class="ap-card ap-card-body" style="text-align:center;">
-            <div style="font-size:28px;font-weight:700;color:var(--success);">{{ total_customers }}</div>
-            <div style="font-size:12px;color:var(--muted);font-weight:600;">Customers</div>
-        </div>
-        <div class="ap-card ap-card-body" style="text-align:center;">
-            <a href="{% url 'invoice_create' %}" class="ap-btn ap-btn-primary ap-btn-full">
-                <i class="bi bi-plus-circle"></i> New Invoice
-            </a>
-        </div>
+<!-- ── STATS ── -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:16px;grid-auto-rows:88px;">
+    <div class="ap-card" style="text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+        <div style="font-size:26px;font-weight:700;color:var(--brand);">{{ total_invoices }}</div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;margin-top:2px;">Total Invoices</div>
+    </div>
+    <div class="ap-card" style="text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+        <div style="font-size:26px;font-weight:700;color:var(--success);">{{ total_customers }}</div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;margin-top:2px;">Customers</div>
+    </div>
+    <div class="ap-card" style="text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+        <div style="font-size:18px;font-weight:700;color:#e67e22;">${{ total_amount|floatformat:2 }}</div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;margin-top:2px;">Total Amount</div>
     </div>
 </div>
 
-<!-- Recent invoices (desktop) -->
-<div class="desktop-only" style="padding:0 28px 28px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <span style="font-size:15px;font-weight:700;">Recent Invoices</span>
-        <a href="{% url 'invoice_list' %}" style="font-size:13px;color:var(--brand);text-decoration:none;">View all →</a>
+<!-- ── RECENT INVOICES ── -->
+<div class="page-inner" style="padding-top:0;">
+    <p class="section-header">Recent Invoices</p>
+    <div class="ap-card">
+        {% for inv in recent_invoices %}
+        <a href="{% url 'invoice_detail' inv.pk %}" class="ap-list-item">
+            <div class="ap-list-icon">
+                <i class="bi bi-{% if inv.status == 'final' %}check-circle-fill{% elif inv.status == 'cancelled' %}x-circle-fill{% else %}file-earmark-text{% endif %}"
+                   style="color:{% if inv.status == 'final' %}var(--success){% elif inv.status == 'cancelled' %}var(--danger){% else %}var(--brand){% endif %};"></i>
+            </div>
+            <div class="ap-list-content">
+                <div class="ap-list-title">{{ inv.invoice_number }}</div>
+                <div class="ap-list-sub">{{ inv.get_customer_display }} · {{ inv.invoice_date|date:"M d, Y" }}</div>
+            </div>
+            <div class="ap-list-right">
+                <div class="ap-list-amount">${{ inv.total }}</div>
+                <span class="ap-badge badge-{{ inv.status }}">{{ inv.status|upper }}</span>
+            </div>
+        </a>
+        {% empty %}
+        <div style="padding:32px;text-align:center;color:var(--muted);">
+            <i class="bi bi-inbox" style="font-size:36px;display:block;margin-bottom:8px;"></i>
+            No invoices found
+        </div>
+        {% endfor %}
     </div>
+    {% if recent_invoices %}
+    <div style="text-align:center;margin-top:12px;">
+        <a href="{% url 'invoice_list' %}" style="font-size:13px;color:var(--brand);text-decoration:none;">View all invoices →</a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ── DESKTOP TABLE ── -->
+<div class="desktop-only" style="padding:0 28px 28px;">
     <div class="ap-card">
         <table class="ap-table">
             <thead>
@@ -89,15 +131,15 @@
                 {% for inv in recent_invoices %}
                 <tr>
                     <td><strong>{{ inv.invoice_number }}</strong></td>
-                    <td>{{ inv.customer.name|default:'-' }}</td>
-                    <td>{{ inv.car.make }} {{ inv.car.model }}</td>
-                    <td>{{ inv.invoice_date|date:"m/d/Y" }}</td>
+                    <td>{{ inv.get_customer_display }}</td>
+                    <td>{% if inv.car %}{{ inv.car.make }} {{ inv.car.model }}{% else %}{{ inv.car_info }}{% endif %}</td>
+                    <td>{{ inv.invoice_date|date:"M d, Y" }}</td>
                     <td><strong>${{ inv.total }}</strong></td>
                     <td><span class="ap-badge badge-{{ inv.status }}">{{ inv.status|upper }}</span></td>
                     <td><a href="{% url 'invoice_detail' inv.pk %}" class="ap-btn ap-btn-outline ap-btn-sm">View</a></td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px;">No invoices yet</td></tr>
+                <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px;">No invoices found</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -110,4 +152,34 @@
 </a>
 {% endif %}
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+var currentPeriod = '{{ period|default:"month" }}';
+
+function setPeriod(btn, p) {
+    currentPeriod = p;
+    document.querySelectorAll('#seg button').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    document.getElementById('custom-dates').style.display = p === 'custom' ? 'flex' : 'none';
+    if (p !== 'custom') applyFilters();
+}
+
+function applyFilters() {
+    var params = new URLSearchParams();
+    params.set('period', currentPeriod);
+    if (currentPeriod === 'custom') {
+        var from = document.getElementById('date-from').value;
+        var to   = document.getElementById('date-to').value;
+        if (from) params.set('date_from', from);
+        if (to)   params.set('date_to', to);
+    }
+    var cust = document.getElementById('filter-customer');
+    var stff = document.getElementById('filter-staff');
+    if (cust && cust.value) params.set('customer', cust.value);
+    if (stff && stff.value) params.set('staff', stff.value);
+    window.location.href = '{% url "dashboard" %}?' + params.toString();
+}
+</script>
 {% endblock %}
