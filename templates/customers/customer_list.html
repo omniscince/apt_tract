@@ -1,86 +1,91 @@
 {% extends 'base.html' %}
 {% block title %}Customers - AutoPro{% endblock %}
 {% block page_title %}Customers{% endblock %}
+{% block desktop_page_title %}Customers{% endblock %}
+
+{% block back_link %}
+<a href="{% url 'dashboard' %}" class="hdr-back"><i class="bi bi-chevron-left"></i> Back</a>
+{% endblock %}
+
 {% block content %}
-<div class="card p-3 mb-4">
-    <form method="get" class="row g-2 align-items-end">
-        <div class="col-md-8">
-            <label class="form-label">Search by Name / Company</label>
-            <input type="text" name="q" class="form-control" placeholder="e.g. John Smith" value="{{ q }}">
-        </div>
-        <div class="col-md-4 d-flex gap-2 align-items-end">
-            <button type="submit" class="btn btn-primary">Search</button>
-            <a href="{% url 'customer_list' %}" class="btn btn-outline-secondary">Reset</a>
-            {% if user.role == 'owner' %}
-            <a href="{% url 'customer_create' %}" class="btn btn-success ms-auto">+ Add Customer</a>
-            {% endif %}
-        </div>
+
+<!-- Search bar -->
+<div style="padding:10px 16px;background:#fff;border-bottom:1px solid var(--border);">
+    <form method="get" style="display:flex;gap:8px;">
+        <input type="text" name="q" class="form-control" placeholder="Search customers…" value="{{ request.GET.q }}" style="flex:1;">
+        <button type="submit" class="ap-btn ap-btn-primary ap-btn-sm"><i class="bi bi-search"></i></button>
     </form>
 </div>
-<div class="card">
-    <div class="table-responsive">
-        <table class="table table-hover mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>Name</th>
-                    <th>Company</th>
-                    <th>Phone</th>
-                    <th>Email</th>
-                    <th>City</th>
-                    <th>Cars</th>
-                    <th></th>
-                </tr>
+
+<!-- Mobile list -->
+<div class="ap-card" style="border-radius:0;border-left:none;border-right:none;border-top:none;">
+    {% for c in customers %}
+    <a href="{% url 'customer_detail' c.pk %}" class="ap-list-item">
+        <div class="ap-list-icon">
+            <i class="bi bi-person-fill"></i>
+        </div>
+        <div class="ap-list-content">
+            <div class="ap-list-title">{{ c.name }}</div>
+            <div class="ap-list-sub">
+                {{ c.phone|default:"" }}{% if c.phone and c.city %} · {% endif %}{{ c.city|default:"" }}
+            </div>
+        </div>
+        <div class="ap-list-right" style="display:flex;align-items:center;gap:8px;">
+            {% if c.cars.count %}
+            <span style="font-size:12px;color:var(--muted);"><i class="bi bi-car-front"></i> {{ c.cars.count }}</span>
+            {% endif %}
+            <i class="bi bi-chevron-right" style="color:var(--muted);"></i>
+        </div>
+    </a>
+    {% empty %}
+    <div style="padding:48px 16px;text-align:center;color:var(--muted);">
+        <i class="bi bi-people" style="font-size:40px;display:block;margin-bottom:10px;"></i>
+        No customers yet
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Desktop table (hidden on mobile) -->
+<div class="desktop-only" style="padding:20px 0;display:none;">
+    <div class="ap-card">
+        <table class="ap-table">
+            <thead>
+                <tr><th>Name</th><th>Phone</th><th>Email</th><th>City</th><th>Cars</th><th></th></tr>
             </thead>
             <tbody>
                 {% for c in customers %}
                 <tr>
                     <td><strong>{{ c.name }}</strong></td>
-                    <td>{{ c.company|default:'-' }}</td>
                     <td>{{ c.phone|default:'-' }}</td>
-                    <td>
-                        {% for email in c.emails.all %}
-                        <small class="d-block">{{ email.email }}{% if email.is_primary %} ⭐{% endif %}</small>
-                        {% empty %}-{% endfor %}
-                    </td>
+                    <td>{{ c.email|default:'-' }}</td>
                     <td>{{ c.city|default:'-' }}</td>
                     <td>{{ c.cars.count }}</td>
-                    <td class="d-flex gap-1">
-                        <a href="{% url 'customer_detail' c.pk %}" class="btn btn-sm btn-outline-secondary">👁</a>
-                        {% if user.role == 'owner' %}
-                        <a href="{% url 'customer_edit' c.pk %}" class="btn btn-sm btn-outline-primary">✏️</a>
-                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="showDeleteModal({{ c.pk }}, '{{ c.name|escapejs }}')">🗑</button>
+                    <td>
+                        <a href="{% url 'customer_detail' c.pk %}" class="ap-btn ap-btn-outline ap-btn-sm">View</a>
+                        {% if user.role in 'owner,staff,accountant' %}
+                        <a href="{% url 'customer_edit' c.pk %}" class="ap-btn ap-btn-outline ap-btn-sm">Edit</a>
                         {% endif %}
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="7" class="text-center text-muted py-4">No customers found</td></tr>
+                <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px;">No customers</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
 
-<div id="delete-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
-    <div class="card p-4" style="max-width:400px;width:90%;">
-        <h5>Delete Customer</h5>
-        <p>Are you sure you want to delete <strong id="delete-name"></strong>?</p>
-        <div class="d-flex gap-2 justify-content-end">
-            <button class="btn btn-outline-secondary" onclick="document.getElementById('delete-modal').style.display='none'">Cancel</button>
-            <form id="delete-form" method="post">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-danger">Delete</button>
-            </form>
-        </div>
-    </div>
-</div>
+{% if user.role in 'owner,staff,accountant' %}
+<a href="{% url 'customer_create' %}" class="fab"><i class="bi bi-plus"></i></a>
+{% endif %}
+
 {% endblock %}
 
 {% block scripts %}
-<script>
-function showDeleteModal(pk, name) {
-    document.getElementById('delete-name').textContent = name;
-    document.getElementById('delete-form').action = '/customers/' + pk + '/delete/';
-    document.getElementById('delete-modal').style.display = 'flex';
+<style>
+@media (min-width: 768px) {
+    .desktop-only { display: block !important; }
+    .ap-card[style*="border-radius:0"] { display: none; }
 }
-</script>
+</style>
 {% endblock %}

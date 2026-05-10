@@ -3,98 +3,409 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>{% block title %}AutoPro{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
     <style>
-        body { background-color: #f8f9fa; }
-        .sidebar { min-height: 100vh; background: #1a1a2e; color: #fff; width: 240px; position: fixed; top: 0; left: 0; padding-top: 20px; z-index: 100; }
-        .sidebar .nav-link { color: #adb5bd; padding: 10px 20px; border-radius: 6px; margin: 2px 10px; }
-        .sidebar .nav-link:hover, .sidebar .nav-link.active { background: #16213e; color: #fff; }
-        .sidebar .nav-link i { margin-right: 8px; }
-        .sidebar-logo { padding: 10px 20px 20px; border-bottom: 1px solid #2d2d4e; margin-bottom: 10px; }
-        .main-content { margin-left: 240px; padding: 20px; }
-        .navbar-top { background: #fff; border-bottom: 1px solid #dee2e6; padding: 10px 20px; margin-left: 240px; position: sticky; top: 0; z-index: 99; }
-        .card { border: none; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
-        .badge-owner { background: #dc3545; }
-        .badge-staff { background: #0d6efd; }
-        .badge-accountant { background: #198754; }
-        .badge-client { background: #6c757d; }
+        :root {
+            --brand:       #000000;
+            --brand-dark:  #000000;
+            --brand-light: #222222;
+            --accent:      #3ecfcf;
+            --accent-dark: #2ab8b8;
+            --bg:          #f4f6fb;
+            --card-bg:     #ffffff;
+            --text:        #1a1f36;
+            --muted:       #7b849a;
+            --border:      #e2e6f0;
+            --danger:      #e53935;
+            --success:     #43a047;
+            --header-h:    52px;
+            --bottom-h:    60px;
+            --radius:      12px;
+            --sb-w:        200px;
+            --sb-w-mini:   56px;
+        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: "DM Sans", sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; min-height: 100vh; }
+
+        /* MOBILE HEADER */
+        .app-header { position: fixed; top: 0; left: 0; right: 0; height: var(--header-h); background: var(--brand); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; z-index: 200; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        .app-header .hdr-side { min-width: 60px; display: flex; align-items: center; }
+        .app-header .hdr-title { flex: 1; text-align: center; color: #fff; font-size: 16px; font-weight: 600; }
+        .hdr-btn { color: #fff; font-size: 20px; text-decoration: none; opacity: 0.9; background: none; border: none; cursor: pointer; padding: 4px; }
+        .hdr-btn:hover { opacity: 1; color: var(--accent); }
+        .hdr-back { display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.9); font-size: 14px; font-weight: 500; text-decoration: none; }
+        .hdr-back i { font-size: 18px; }
+        .hdr-logo { height: 28px; width: auto; display: block; }
+
+        /* MAIN BODY */
+        .app-body { padding-top: var(--header-h); padding-bottom: calc(var(--bottom-h) + 8px); min-height: 100vh; }
+        .app-body.no-bottom { padding-bottom: 16px; }
+        .page-inner { padding: 16px; }
+
+        /* BOTTOM NAV */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: var(--bottom-h); background: #fff; border-top: 1px solid var(--border); display: flex; align-items: stretch; z-index: 200; }
+        .bottom-nav a { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--muted); text-decoration: none; font-size: 10px; font-weight: 600; gap: 2px; transition: color 0.15s; }
+        .bottom-nav a i { font-size: 20px; }
+        .bottom-nav a.active, .bottom-nav a:hover { color: var(--brand); }
+
+        /* DESKTOP */
+        @media (min-width: 768px) {
+            .app-header  { display: none !important; }
+            .bottom-nav  { display: none !important; }
+            .desktop-sidebar { display: flex !important; }
+            .desktop-topbar  { display: flex !important; }
+            .app-body { padding-top: 0; padding-bottom: 0; margin-left: var(--sb-w); transition: margin-left 0.25s ease; }
+            .app-body.sb-mini { margin-left: var(--sb-w-mini); }
+            .page-inner { padding: 24px 28px; }
+        }
+        @media (max-width: 767px) {
+            .desktop-sidebar { display: none !important; }
+            .desktop-topbar  { display: none !important; }
+            .desktop-only    { display: none !important; }
+        }
+
+        /* SIDEBAR */
+        .desktop-sidebar {
+            display: none;
+            position: fixed; top: 0; left: 0; bottom: 0;
+            width: var(--sb-w);
+            background: var(--brand);
+            flex-direction: column;
+            z-index: 100;
+            overflow: hidden;
+            transition: width 0.25s ease;
+        }
+        .desktop-sidebar.sb-mini { width: var(--sb-w-mini); }
+
+        .sb-logo { padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; white-space: nowrap; }
+        .sb-logo img { height: 30px; width: auto; flex-shrink: 0; }
+
+        .desktop-sidebar nav { flex: 1; padding: 8px 0; overflow-y: auto; overflow-x: hidden; }
+        .desktop-sidebar nav a {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 16px; color: rgba(255,255,255,0.7);
+            text-decoration: none; font-size: 14px; font-weight: 500;
+            border-radius: 8px; margin: 2px 8px;
+            transition: background 0.15s, color 0.15s;
+            white-space: nowrap; overflow: hidden;
+        }
+        .desktop-sidebar nav a i { font-size: 17px; flex-shrink: 0; }
+        .desktop-sidebar nav a .nav-label { overflow: hidden; transition: opacity 0.2s; }
+        .desktop-sidebar nav a:hover, .desktop-sidebar nav a.active { background: rgba(255,255,255,0.12); color: #fff; }
+        .desktop-sidebar nav hr { border-color: rgba(255,255,255,0.1); margin: 8px 16px; }
+
+        /* collapsed state */
+        .desktop-sidebar.sb-mini nav a { justify-content: center; padding: 10px 0; margin: 2px 6px; }
+        .desktop-sidebar.sb-mini .nav-label { width: 0; opacity: 0; }
+        .desktop-sidebar.sb-mini nav hr { margin: 8px 6px; }
+
+        .sb-footer { padding: 12px 16px; border-top: 1px solid rgba(255,255,255,0.1); white-space: nowrap; overflow: hidden; }
+        .sb-footer .sb-name { color: #fff; font-size: 13px; font-weight: 600; display: block; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; }
+        .sb-footer .sb-role { margin-bottom: 6px; display: block; }
+        .sb-footer a { color: rgba(255,255,255,0.5); font-size: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+        .sb-footer .sb-text { overflow: hidden; transition: opacity 0.2s; }
+        .desktop-sidebar.sb-mini .sb-text { width: 0; opacity: 0; }
+        .desktop-sidebar.sb-mini .sb-footer { padding: 12px 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+
+        .sb-toggle-btn { background: none; border: none; cursor: pointer; color: rgba(255,255,255,0.5); font-size: 18px; padding: 6px; border-radius: 6px; transition: color 0.15s, background 0.15s; display: flex; align-items: center; }
+        .sb-toggle-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
+
+        /* TOPBAR */
+        .desktop-topbar { display: none; position: sticky; top: 0; background: #fff; border-bottom: 1px solid var(--border); padding: 10px 28px; align-items: center; justify-content: space-between; z-index: 99; }
+        .desktop-topbar h6 { margin: 0; font-size: 17px; font-weight: 700; }
+
+        /* CARDS */
+        .ap-card { background: var(--card-bg); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; }
+        .ap-card + .ap-card { margin-top: 12px; }
+        .ap-card-body { padding: 16px; }
+
+        /* HOME GRID */
+        .home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 20px 16px; }
+        .home-tile { background: #fff; border-radius: 14px; border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 26px 12px 20px; text-decoration: none; color: var(--text); gap: 10px; transition: box-shadow 0.15s, transform 0.15s; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .home-tile:hover { box-shadow: 0 4px 16px rgba(26,74,74,0.18); transform: translateY(-2px); color: var(--brand); }
+        .home-tile i { font-size: 36px; color: var(--brand); }
+        .home-tile span { font-size: 13px; font-weight: 600; text-align: center; }
+
+        /* LIST ROWS */
+        .ap-list-item { display: flex; align-items: center; padding: 13px 16px; border-bottom: 1px solid var(--border); gap: 12px; text-decoration: none; color: var(--text); transition: background 0.1s; }
+        .ap-list-item:last-child { border-bottom: none; }
+        .ap-list-item:hover { background: #f7f8fc; }
+        .ap-list-icon { width: 38px; height: 38px; border-radius: 10px; background: #eef1fb; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 17px; color: var(--brand); }
+        .ap-list-content { flex: 1; min-width: 0; }
+        .ap-list-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ap-list-sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+        .ap-list-right { text-align: right; flex-shrink: 0; }
+        .ap-list-amount { font-size: 14px; font-weight: 700; color: var(--brand); }
+
+        /* BADGES */
+        .ap-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; }
+        .badge-draft      { background: #e8eaf2; color: #555e87; }
+        .badge-final      { background: #e6f4ea; color: #2e7d32; }
+        .badge-cancelled  { background: #fce8e8; color: #c62828; }
+        .badge-owner      { background: #fce8e8; color: #c62828; }
+        .badge-staff      { background: #e8eef9; color: #1a56a0; }
+        .badge-accountant { background: #e6f4ea; color: #2e7d32; }
+        .badge-client     { background: #f0f0f0; color: #555; }
+
+        /* SEGMENT CONTROL */
+        .seg-control { display: flex; background: #eef0f8; border-radius: 8px; padding: 3px; gap: 2px; }
+        .seg-control button { flex: 1; border: none; background: transparent; padding: 6px 4px; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; transition: background 0.15s, color 0.15s; font-family: "DM Sans", sans-serif; }
+        .seg-control button.active { background: var(--brand); color: #fff; }
+
+        /* FORMS */
+        .ap-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; display: block; }
+        .form-group { margin-bottom: 14px; }
+        .form-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        input[type=text].form-control, input[type=number].form-control, input[type=email].form-control, input[type=password].form-control, input[type=date].form-control, input[type=tel].form-control, select.form-control, textarea.form-control { border: 1px solid var(--border) !important; border-radius: 10px !important; padding: 10px 14px !important; font-size: 15px !important; font-family: "DM Sans", sans-serif !important; color: var(--text) !important; background: #fff !important; box-shadow: none !important; }
+        input[type=text].form-control:focus, input[type=number].form-control:focus, input[type=email].form-control:focus, input[type=password].form-control:focus, input[type=date].form-control:focus, input[type=tel].form-control:focus, select.form-control:focus, textarea.form-control:focus { border-color: var(--brand) !important; box-shadow: 0 0 0 3px rgba(26,74,74,0.1) !important; }
+
+        /* BUTTONS */
+        .ap-btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; border-radius: 10px; font-size: 14px; font-weight: 600; font-family: "DM Sans", sans-serif; border: none; cursor: pointer; transition: opacity 0.15s, transform 0.1s; text-decoration: none; }
+        .ap-btn:active { transform: scale(0.97); }
+        .ap-btn-primary { background: var(--brand); color: #fff; }
+        .ap-btn-primary:hover { background: var(--brand-light); color: #fff; }
+        .ap-btn-accent { background: var(--accent); color: #fff; }
+        .ap-btn-outline { background: transparent; border: 1.5px solid var(--border); color: var(--text); }
+        .ap-btn-outline:hover { border-color: var(--brand); color: var(--brand); }
+        .ap-btn-danger { background: var(--danger); color: #fff; }
+        .ap-btn-success { background: var(--success); color: #fff; }
+        .ap-btn-full { width: 100%; justify-content: center; }
+        .ap-btn-sm { padding: 6px 12px; font-size: 13px; border-radius: 8px; }
+        .btn-primary   { background: var(--brand)   !important; border-color: var(--brand)   !important; border-radius: 10px !important; font-family: "DM Sans", sans-serif !important; font-weight: 600 !important; }
+        .btn-success   { background: var(--success) !important; border-color: var(--success) !important; border-radius: 10px !important; font-family: "DM Sans", sans-serif !important; font-weight: 600 !important; }
+        .btn-outline-secondary { border-radius: 10px !important; font-family: "DM Sans", sans-serif !important; font-weight: 600 !important; }
+        .btn-outline-primary   { border-radius: 8px !important; font-family: "DM Sans", sans-serif !important; font-weight: 600 !important; color: var(--brand) !important; border-color: var(--brand) !important; }
+        .btn-sm { padding: 5px 10px !important; font-size: 13px !important; }
+
+        /* DATE NAV */
+        .date-nav { display: flex; align-items: center; justify-content: space-between; padding: 11px 16px; background: #fff; border-bottom: 1px solid var(--border); }
+        .date-nav .date-label { font-size: 15px; font-weight: 600; }
+        .date-nav-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--bg); border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px; color: var(--brand); transition: background 0.15s; }
+        .date-nav-btn:hover { background: #dde2f4; }
+
+        /* SUMMARY */
+        .summary-block { text-align: center; padding: 20px 16px; }
+        .summary-label { font-size: 13px; color: var(--muted); font-weight: 500; margin-bottom: 2px; }
+        .summary-value { font-size: 32px; font-weight: 700; color: var(--text); line-height: 1.1; }
+        .summary-value.lg { font-size: 40px; }
+
+        /* TOAST */
+        .ap-toast { position: fixed; bottom: calc(var(--bottom-h) + 12px); left: 50%; transform: translateX(-50%); background: rgba(15,46,46,0.93); color: #fff; padding: 10px 20px; border-radius: 24px; font-size: 13px; font-weight: 500; z-index: 9999; opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap; }
+        .ap-toast.show { opacity: 1; }
+
+        /* BOTTOM SHEET */
+        .ap-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 500; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+        .ap-overlay.open { opacity: 1; pointer-events: all; }
+        .ap-sheet { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-radius: 20px 20px 0 0; padding: 20px 20px 32px; max-width: 480px; margin: 0 auto; z-index: 501; transform: translateY(100%); transition: transform 0.25s; }
+        .ap-sheet.open { transform: translateY(0); }
+        .ap-sheet-handle { width: 36px; height: 4px; border-radius: 2px; background: var(--border); margin: 0 auto 16px; display: block; }
+        .ap-sheet-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; text-align: center; }
+        .ap-sheet-actions { display: flex; gap: 10px; margin-top: 16px; }
+        .ap-sheet-actions button { flex: 1; }
+
+        /* INFO GRID */
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; padding: 16px; }
+        .info-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+        .info-value { font-size: 14px; font-weight: 500; color: var(--text); margin-top: 2px; }
+
+        /* FAB */
+        .fab { position: fixed; bottom: calc(var(--bottom-h) + 14px); right: 16px; width: 52px; height: 52px; border-radius: 50%; background: var(--brand); color: #fff; border: none; font-size: 24px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(26,74,74,0.35); cursor: pointer; text-decoration: none; z-index: 190; transition: transform 0.15s; }
+        .fab:hover { transform: scale(1.07); color: #fff; }
+        .fab.fab-above-tabs { bottom: calc(var(--bottom-h) + 48px + 14px); }
+
+        /* ALERTS */
+        .ap-alert { border-radius: 10px; padding: 12px 16px; font-size: 14px; margin-bottom: 12px; }
+        .ap-alert-success { background: #e6f4ea; color: #2e7d32; }
+        .ap-alert-danger  { background: #fce8e8; color: #c62828; }
+        .ap-alert-info    { background: #e3f2fd; color: #1565c0; }
+        .ap-alert-warning { background: #fff8e1; color: #f57f17; }
+
+        /* MISC */
+        .divider { border: none; border-top: 1px solid var(--border); margin: 0; }
+        .section-header { font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted); padding: 10px 16px 4px; }
+        .text-muted-ap { color: var(--muted); }
+        .fw-600 { font-weight: 600; }
+
+        /* TABLES */
+        .ap-table { width: 100%; border-collapse: collapse; }
+        .ap-table th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); padding: 10px 14px; background: #f7f8fc; border-bottom: 1px solid var(--border); }
+        .ap-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
+        .ap-table tbody tr:hover td { background: #f7f8fc; }
+
+        /* CREW PICKER */
+        .crew-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: #fff; border-bottom: 1px solid var(--border); }
+        .crew-label { font-size: 13px; color: var(--muted); font-weight: 500; }
+        .crew-select { border: none; background: transparent; font-size: 14px; font-weight: 700; color: var(--brand); cursor: pointer; font-family: "DM Sans", sans-serif; appearance: none; padding-right: 20px; }
+        .crew-select-wrap { position: relative; }
+        .crew-select-wrap::after { content: "▾"; position: absolute; right: 0; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--muted); pointer-events: none; }
+
+        /* LOGIN */
+        .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--brand); padding: 20px; }
+        .login-card { background: #fff; border-radius: 20px; padding: 32px 28px; width: 100%; max-width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+        .login-logo { text-align: center; margin-bottom: 24px; }
+        .login-logo img { height: 56px; width: auto; margin-bottom: 12px; }
+        .login-logo p { color: var(--muted); font-size: 14px; margin: 0; }
     </style>
 </head>
 <body>
+
 {% if user.is_authenticated %}
-<div class="sidebar">
-    <div class="sidebar-logo">
-        <img src="{% static 'images/logo.svg' %}" height="36" alt="AutoPro">
-        <div class="mt-1">
-            <small class="text-muted">AutoPro CRM</small>
-        </div>
+
+<!-- MOBILE HEADER -->
+<header class="app-header">
+    <div class="hdr-side">{% block back_link %}{% endblock %}</div>
+    <a href="{% url "dashboard" %}" class="hdr-title" style="display:flex;align-items:center;justify-content:center;text-decoration:none;">
+        <img src="{% static "images/logo_white.svg" %}" class="hdr-logo" alt="AutoProtinting">
+    </a>
+    <div class="hdr-side" style="justify-content:flex-end;">
+        <a href="{% url "dashboard" %}" class="hdr-btn"><i class="bi bi-house-fill"></i></a>
     </div>
-    <nav class="nav flex-column">
-        <a href="{% url 'dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
-            <i class="bi bi-speedometer2"></i> Dashboard
+</header>
+
+<!-- DESKTOP SIDEBAR -->
+<div class="desktop-sidebar" id="desktop-sidebar">
+    <div class="sb-logo">
+        <img src="{% static "images/logo_white.svg" %}" alt="AutoProtinting">
+    </div>
+    <nav>
+        <a href="{% url "dashboard" %}" class="{% if request.resolver_match.url_name == "dashboard" %}active{% endif %}">
+            <i class="bi bi-speedometer2"></i><span class="nav-label">&nbsp;Dashboard</span>
         </a>
-        {% if user.role != 'client' %}
-        <a href="{% url 'invoice_list' %}" class="nav-link {% if 'invoice' in request.resolver_match.url_name %}active{% endif %}">
-            <i class="bi bi-file-text"></i> Invoices
-        </a>
-        {% endif %}
-        {% if user.role in 'owner,staff,accountant' %}
-        <a href="{% url 'customer_list' %}" class="nav-link {% if 'customer' in request.resolver_match.url_name %}active{% endif %}">
-            <i class="bi bi-building"></i> Customers
-        </a>
-        <a href="{% url 'car_list' %}" class="nav-link {% if 'car' in request.resolver_match.url_name %}active{% endif %}">
-            <i class="bi bi-car-front"></i> Cars
-        </a>
-        {% endif %}
-        {% if user.role in 'owner,accountant' %}
-        <a href="{% url 'monthly_report' %}" class="nav-link {% if 'report' in request.resolver_match.url_name %}active{% endif %}">
-            <i class="bi bi-bar-chart"></i> Monthly Report
+        {% if user.role != "client" %}
+        <a href="{% url "invoice_list" %}" class="{% if "invoice" in request.resolver_match.url_name %}active{% endif %}">
+            <i class="bi bi-file-text"></i><span class="nav-label">&nbsp;Invoices</span>
         </a>
         {% endif %}
-        {% if user.role == 'owner' %}
-        <hr class="text-muted mx-3">
-        <a href="{% url 'crew_report' %}" class="nav-link {% if request.resolver_match.url_name == 'crew_report' %}active{% endif %}">
-            <i class="bi bi-person-lines-fill"></i> Crew Report
+        {% if user.role in "owner,staff,accountant" %}
+        <a href="{% url "customer_list" %}" class="{% if "customer" in request.resolver_match.url_name %}active{% endif %}">
+            <i class="bi bi-people"></i><span class="nav-label">&nbsp;Customers</span>
         </a>
-        <a href="{% url 'customer_report' %}" class="nav-link {% if request.resolver_match.url_name == 'customer_report' %}active{% endif %}">
-            <i class="bi bi-people-fill"></i> Customer Report
+        <a href="{% url "car_list" %}" class="{% if "car" in request.resolver_match.url_name %}active{% endif %}">
+            <i class="bi bi-car-front"></i><span class="nav-label">&nbsp;Cars</span>
         </a>
-        <a href="{% url 'user_list' %}" class="nav-link {% if 'user' in request.resolver_match.url_name %}active{% endif %}">
-            <i class="bi bi-people"></i> Users
+        {% endif %}
+        {% if user.role in "owner,accountant" %}
+        <a href="{% url "monthly_report" %}" class="{% if "report" in request.resolver_match.url_name %}active{% endif %}">
+            <i class="bi bi-bar-chart"></i><span class="nav-label">&nbsp;Reports</span>
         </a>
-        <a href="{% url 'download_db' %}" class="nav-link">
-            <i class="bi bi-download"></i> Backup DB
+        {% endif %}
+        {% if user.role == "owner" %}
+        <hr>
+        <a href="{% url "crew_report" %}" class="{% if request.resolver_match.url_name == "crew_report" %}active{% endif %}">
+            <i class="bi bi-person-lines-fill"></i><span class="nav-label">&nbsp;Crew Report</span>
+        </a>
+        <a href="{% url "customer_report" %}" class="{% if request.resolver_match.url_name == "customer_report" %}active{% endif %}">
+            <i class="bi bi-people-fill"></i><span class="nav-label">&nbsp;Customer Report</span>
+        </a>
+        <a href="{% url "user_list" %}" class="{% if "user" in request.resolver_match.url_name %}active{% endif %}">
+            <i class="bi bi-gear"></i><span class="nav-label">&nbsp;Settings</span>
+        </a>
+        <a href="{% url "download_db" %}">
+            <i class="bi bi-download"></i><span class="nav-label">&nbsp;Backup DB</span>
         </a>
         {% endif %}
     </nav>
-</div>
-
-<div class="navbar-top d-flex justify-content-between align-items-center">
-    <h6 class="mb-0">{% block page_title %}{% endblock %}</h6>
-    <div class="d-flex align-items-center gap-3">
-        <span class="badge badge-{{ user.role }}">{{ user.role|upper }}</span>
-        <span class="text-muted small">{{ user.email }}</span>
-        <a href="{% url 'logout' %}" class="btn btn-sm btn-outline-danger">
-            <i class="bi bi-box-arrow-right"></i> Logout
-        </a>
+    <div class="sb-footer">
+        <span class="sb-name sb-text">{{ user.get_full_name|default:user.email }}</span>
+        <span class="sb-role sb-text"><span class="ap-badge badge-{{ user.role }}">{{ user.role|upper }}</span></span>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+            <a href="{% url "logout" %}" class="sb-text"><i class="bi bi-box-arrow-right"></i>&nbsp;Logout</a>
+            <button class="sb-toggle-btn" onclick="toggleSidebar()" title="Toggle sidebar">
+                <i class="bi bi-layout-sidebar-reverse" id="sb-icon"></i>
+            </button>
+        </div>
     </div>
 </div>
+
+<!-- DESKTOP TOPBAR -->
+<div class="desktop-topbar">
+    <h6>{% block desktop_page_title %}{% endblock %}</h6>
+    <div style="display:flex;align-items:center;gap:12px;">
+        <span class="ap-badge badge-{{ user.role }}">{{ user.role|upper }}</span>
+        <span style="color:var(--muted);font-size:13px;">{{ user.email }}</span>
+        <a href="{% url "logout" %}" class="ap-btn ap-btn-outline ap-btn-sm"><i class="bi bi-box-arrow-right"></i> Logout</a>
+    </div>
+</div>
+
 {% endif %}
 
-<div class="{% if user.is_authenticated %}main-content{% else %}container mt-5{% endif %}">
+<main class="app-body{% if not user.is_authenticated %} no-bottom{% endif %}" id="app-body">
     {% for message in messages %}
-    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
+    <div class="ap-alert ap-alert-{{ message.tags }} mx-3 mt-3" id="django-msg">{{ message }}</div>
     {% endfor %}
     {% block content %}{% endblock %}
-</div>
+</main>
 
+{% if user.is_authenticated %}
+<nav class="bottom-nav">
+    <a href="{% url "dashboard" %}" class="{% if request.resolver_match.url_name == "dashboard" %}active{% endif %}">
+        <i class="bi bi-house"></i>Home
+    </a>
+    {% if user.role != "client" %}
+    <a href="{% url "invoice_list" %}" class="{% if "invoice" in request.resolver_match.url_name and request.resolver_match.url_name != "invoice_detail" %}active{% endif %}">
+        <i class="bi bi-file-earmark-text"></i>Invoices
+    </a>
+    {% endif %}
+    {% if user.role in "owner,staff,accountant" %}
+    <a href="{% url "customer_list" %}" class="{% if "customer" in request.resolver_match.url_name %}active{% endif %}">
+        <i class="bi bi-people"></i>Customers
+    </a>
+    {% endif %}
+    {% if user.role in "owner,accountant" %}
+    <a href="{% url "monthly_report" %}" class="{% if "report" in request.resolver_match.url_name %}active{% endif %}">
+        <i class="bi bi-bar-chart"></i>Reports
+    </a>
+    {% endif %}
+    {% if user.role == "owner" %}
+    <a href="{% url "user_list" %}" class="{% if "user" in request.resolver_match.url_name %}active{% endif %}">
+        <i class="bi bi-gear"></i>Settings
+    </a>
+    {% endif %}
+</nav>
+{% endif %}
+
+<div class="ap-toast" id="ap-toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function toggleSidebar() {
+    var sb = document.getElementById("desktop-sidebar");
+    var body = document.getElementById("app-body");
+    var icon = document.getElementById("sb-icon");
+    var mini = sb.classList.toggle("sb-mini");
+    body.classList.toggle("sb-mini", mini);
+    icon.className = mini ? "bi bi-layout-sidebar" : "bi bi-layout-sidebar-reverse";
+    localStorage.setItem("sb_mini", mini ? "1" : "0");
+}
+(function(){
+    if (localStorage.getItem("sb_mini") === "1") {
+        var sb = document.getElementById("desktop-sidebar");
+        var body = document.getElementById("app-body");
+        var icon = document.getElementById("sb-icon");
+        if (sb) sb.classList.add("sb-mini");
+        if (body) body.classList.add("sb-mini");
+        if (icon) icon.className = "bi bi-layout-sidebar";
+    }
+})();
+function showToast(msg, dur) {
+    dur = dur || 2500;
+    var t = document.getElementById("ap-toast");
+    t.textContent = msg; t.classList.add("show");
+    setTimeout(function(){ t.classList.remove("show"); }, dur);
+}
+function openSheet(n) { document.getElementById(n+"-overlay").classList.add("open"); document.getElementById(n+"-sheet").classList.add("open"); }
+function closeSheet(n) { document.getElementById(n+"-overlay").classList.remove("open"); document.getElementById(n+"-sheet").classList.remove("open"); }
+{% for message in messages %}
+if (window.innerWidth < 768) {
+    setTimeout(function(){ showToast("{{ message|escapejs }}"); }, 300);
+    var el = document.getElementById("django-msg");
+    if (el) el.style.display = "none";
+}
+{% endfor %}
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

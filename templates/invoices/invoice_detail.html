@@ -1,227 +1,280 @@
 {% extends 'base.html' %}
-{% block title %}Invoice {{ invoice.invoice_number }} - AutoPro{% endblock %}
-{% block page_title %}Invoice #{{ invoice.invoice_number }}{% endblock %}
+{% block title %}{{ invoice.invoice_number }} - AutoPro{% endblock %}
+{% block page_title %}{{ invoice.invoice_number }}{% endblock %}
+{% block desktop_page_title %}Invoice #{{ invoice.invoice_number }}{% endblock %}
+
+{% block back_link %}
+<a href="{% url 'invoice_list' %}" class="hdr-back"><i class="bi bi-chevron-left"></i> Back</a>
+{% endblock %}
+
 {% block content %}
+<div class="page-inner">
 
-<div class="d-flex justify-content-between mb-4">
-    <button onclick="history.back()" class="btn btn-outline-secondary btn-sm">← Back</button>
-    <div class="d-flex gap-2 align-items-center">
-        {% if invoice.status == 'final' %}
-        <span class="badge bg-success fs-6">Final</span>
-        {% elif invoice.status == 'cancelled' %}
-        <span class="badge bg-danger fs-6">Cancelled</span>
-        {% else %}
-        <span class="badge bg-secondary fs-6">Draft</span>
-        {% endif %}
-
-        <a href="{% url 'invoice_edit' invoice.pk %}" class="btn btn-outline-primary">Edit</a>
-
-        <div class="dropdown">
-            <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                Options
-            </button>
-            <ul class="dropdown-menu dropdown-menu-end">
-                <li>
-                    <button class="dropdown-item" onclick="openSendModal()">
-                        📧 Send Invoice
-                    </button>
-                </li>
-                <li>
-                    <form method="post" action="{% url 'invoice_action' invoice.pk %}">
-                        {% csrf_token %}
-                        <input type="hidden" name="action" value="cancel">
-                        <button class="dropdown-item text-danger" type="submit"
-                                onclick="return confirm('Cancel this invoice?')">
-                            ❌ Cancel Invoice
-                        </button>
-                    </form>
-                </li>
-                <li><hr class="dropdown-divider"></li>
-                <li>
-                    <a href="{% url 'invoice_pdf' invoice.pk %}" class="dropdown-item">
-                        📄 Download PDF
-                    </a>
-                </li>
-                <li><hr class="dropdown-divider"></li>
-                <li>
-                    <form method="post" action="{% url 'invoice_delete' invoice.pk %}"
-                          onsubmit="return confirm('Delete this invoice?')">
-                        {% csrf_token %}
-                        <button class="dropdown-item text-danger" type="submit">🗑 Delete</button>
-                    </form>
-                </li>
-            </ul>
-        </div>
-    </div>
-</div>
-
-<!-- Send Modal -->
-<div class="modal fade" id="sendModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Send Invoice #{{ invoice.invoice_number }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="post" action="{% url 'invoice_action' invoice.pk %}">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="send">
-                <div class="modal-body">
-                    <p class="text-muted">You can edit, add or remove email addresses before sending.</p>
-                    <div id="email-list">
-                        {% if invoice.customer %}
-                            {% for email in invoice.customer.get_all_emails %}
-                            <div class="input-group mb-2 email-row">
-                                <input type="email" name="emails" value="{{ email }}" class="form-control">
-                                <button type="button" class="btn btn-outline-danger" onclick="removeEmail(this)">✕</button>
-                            </div>
-                            {% empty %}
-                            <div class="input-group mb-2 email-row">
-                                <input type="email" name="emails" value="" class="form-control" placeholder="Enter email">
-                                <button type="button" class="btn btn-outline-danger" onclick="removeEmail(this)">✕</button>
-                            </div>
-                            {% endfor %}
-                        {% else %}
-                        <div class="input-group mb-2 email-row">
-                            <input type="email" name="emails" value="" class="form-control" placeholder="Enter email">
-                            <button type="button" class="btn btn-outline-danger" onclick="removeEmail(this)">✕</button>
-                        </div>
-                        {% endif %}
-                    </div>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addEmail()">+ Add Email</button>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Send</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<div class="card p-4">
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <h5 class="fw-bold">Autoprotinting</h5>
-            <p class="mb-0 text-muted">
-                44 Edwin Pearson Street<br>
-                Aurora, ON, L4G 0S1<br>
-                Canada<br>
-                (647) 771-1112<br>
-                HST# 73543 4672 RC0001
-            </p>
-        </div>
-        <div class="col-md-6 text-end">
-            <h4 class="fw-bold">Invoice #{{ invoice.invoice_number }}</h4>
-            <p class="mb-0">
-                Invoice Date: {{ invoice.invoice_date|date:"N j, Y" }}<br>
-                {% if invoice.due_date %}Payment Due: {{ invoice.due_date|date:"N j, Y" }}<br>{% endif %}
-                {% if invoice.po_number %}PO Number: {{ invoice.po_number }}<br>{% endif %}
-                {% if invoice.last_edit_date %}Last Edit: {{ invoice.last_edit_date|date:"N j, Y" }}{% endif %}
-            </p>
-        </div>
-    </div>
-
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <strong>Bill To:</strong>
-            <p class="mb-0 mt-1">
-                {{ invoice.get_customer_display }}<br>
-                {% if invoice.customer %}
-                    {% if invoice.customer.company %}{{ invoice.customer.company }}<br>{% endif %}
-                    {% if invoice.customer.address %}{{ invoice.customer.address }}<br>{% endif %}
-                    {% if invoice.customer.city %}{{ invoice.customer.city }}, {{ invoice.customer.province }}<br>{% endif %}
-                    {% if invoice.customer.phone %}{{ invoice.customer.phone }}<br>{% endif %}
-                    {% for email in invoice.customer.emails.all %}
-                    {{ email.email }}<br>
-                    {% endfor %}
-                {% endif %}
-            </p>
-        </div>
-    </div>
-
-    <div class="alert alert-light border mb-4">
-        <strong>{{ invoice.get_car_display }}</strong>
-    </div>
-
-    <table class="table table-bordered">
-        <thead class="table-light">
-            <tr>
-                <th>Description</th>
-                <th class="text-end" style="width:150px;">Amount</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in invoice.items.all %}
-            <tr>
-                <td>{{ item.description }}</td>
-                <td class="text-end">${{ item.price }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-        <tfoot>
-            <tr>
-                <td class="text-end"><strong>Subtotal:</strong></td>
-                <td class="text-end">${{ invoice.subtotal }}</td>
-            </tr>
-            {% if invoice.hst > 0 %}
-            <tr>
-                <td class="text-end"><strong>HST (13%):</strong></td>
-                <td class="text-end">${{ invoice.hst }}</td>
-            </tr>
+    <!-- Status badge -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <span class="ap-badge badge-{{ invoice.status }}" style="font-size:13px;padding:5px 14px;">
+            {{ invoice.status|upper }}
+        </span>
+        <div style="display:flex;gap:8px;">
+            {% if invoice.status != 'cancelled' %}
+            <a href="{% url 'invoice_edit' invoice.pk %}" class="ap-btn ap-btn-outline ap-btn-sm">
+                <i class="bi bi-pencil"></i> Edit
+            </a>
             {% endif %}
-            <tr class="table-dark">
-                <td class="text-end"><strong>Total:</strong></td>
-                <td class="text-end"><strong>${{ invoice.total }}</strong></td>
-            </tr>
-        </tfoot>
-    </table>
-
-    {% if invoice.notes %}
-    <div class="alert alert-light border mt-3">
-        <small><strong>Internal Notes:</strong> {{ invoice.notes }}</small>
+            <button class="ap-btn ap-btn-outline ap-btn-sm" onclick="openActions()">
+                <i class="bi bi-three-dots"></i>
+            </button>
+        </div>
     </div>
+
+    <!-- Company + Customer header -->
+    <div class="ap-card" style="margin-bottom:12px;">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;">
+            <div style="width:40px;height:40px;border-radius:10px;background:#eef1fb;display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--brand);">
+                <i class="bi bi-geo-alt-fill"></i>
+            </div>
+            <div>
+                <div style="font-size:14px;font-weight:700;">{{ invoice.get_customer_display }}</div>
+                {% if invoice.customer and invoice.customer.address %}
+                <div style="font-size:12px;color:var(--muted);">{{ invoice.customer.address }}</div>
+                {% endif %}
+            </div>
+            {% if invoice.customer and invoice.customer.phone %}
+            <a href="tel:{{ invoice.customer.phone }}" style="margin-left:auto;color:var(--brand);font-size:20px;text-decoration:none;">
+                <i class="bi bi-telephone-fill"></i>
+            </a>
+            {% endif %}
+        </div>
+        {% if invoice.customer %}
+        {% for email in invoice.customer.emails.all %}
+        <div style="padding:8px 16px;font-size:13px;color:var(--brand);">
+            <i class="bi bi-envelope" style="margin-right:6px;"></i>{{ email.email }}
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+
+    <!-- Invoice metadata grid -->
+    <div class="ap-card" style="margin-bottom:12px;">
+        <div class="info-grid">
+            <div>
+                <div class="info-label">Invoice Number</div>
+                <div class="info-value fw-600">{{ invoice.invoice_number }}</div>
+            </div>
+            <div>
+                <div class="info-label">Invoice Date</div>
+                <div class="info-value">{{ invoice.invoice_date|date:"D M d Y" }}</div>
+            </div>
+            <div>
+                <div class="info-label">PO Number</div>
+                <div class="info-value">{{ invoice.po_number|default:"—" }}</div>
+            </div>
+            <div>
+                <div class="info-label">Email</div>
+                <div class="info-value" style="font-size:12px;">
+                    {% if invoice.customer %}
+                    {% for email in invoice.customer.emails.all %}{{ email.email }}{% endfor %}
+                    {% else %}—{% endif %}
+                </div>
+            </div>
+            <div>
+                <div class="info-label">Invoice Term</div>
+                <div class="info-value">{{ invoice.due_date|date:"D M d Y"|default:"DUE UPON RECEIPT" }}</div>
+            </div>
+            <div>
+                <div class="info-label">Generated By</div>
+                <div class="info-value">{{ invoice.created_by.get_full_name|default:"—" }}</div>
+            </div>
+        </div>
+        <div style="padding:0 16px 14px;">
+            <div class="info-label">Billing</div>
+            <div class="info-value" style="margin-top:4px;font-weight:700;">{{ invoice.get_car_display }}</div>
+        </div>
+    </div>
+
+    <!-- Line items -->
+    <div class="ap-card" style="margin-bottom:12px;">
+        <div style="padding:12px 16px;border-bottom:1px solid var(--border);font-weight:700;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">
+            {{ invoice.get_car_display }}
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 16px 4px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">
+            <span>Task Name</span><span>Total</span>
+        </div>
+        {% for item in invoice.items.all %}
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-top:1px solid var(--border);">
+            <span style="font-size:14px;font-weight:500;">{{ item.description }}</span>
+            <span style="font-size:14px;font-weight:700;">${{ item.price }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    </div>
+
+    <!-- Totals -->
+    <div class="ap-card" style="margin-bottom:80px;">
+        <div style="display:flex;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
+            <span style="font-size:14px;color:var(--muted);">Sub Total</span>
+            <span style="font-size:14px;font-weight:600;">${{ invoice.subtotal }}</span>
+        </div>
+        {% if invoice.hst > 0 %}
+        <div style="display:flex;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
+            <span style="font-size:14px;color:var(--muted);">Plus Applicable Taxes (HST 13%)</span>
+            <span style="font-size:14px;font-weight:600;">${{ invoice.hst }}</span>
+        </div>
+        {% endif %}
+        <div style="display:flex;justify-content:space-between;padding:16px;background:#f7f8fc;">
+            <span style="font-size:18px;font-weight:700;">Total</span>
+            <span style="font-size:22px;font-weight:700;color:var(--brand);">${{ invoice.total }}</span>
+        </div>
+    </div>
+
+</div>
+
+<!-- ACTIONS BOTTOM SHEET -->
+<div class="ap-overlay" id="actions-overlay" onclick="closeActions()"></div>
+<div class="ap-sheet" id="actions-sheet">
+    <span class="ap-sheet-handle"></span>
+    <div class="ap-sheet-title">Invoice Actions</div>
+
+    <a href="{% url 'invoice_pdf' invoice.pk %}" class="ap-list-item" style="border-radius:10px;border:1px solid var(--border);margin-bottom:8px;">
+        <div class="ap-list-icon"><i class="bi bi-printer"></i></div>
+        <div class="ap-list-content"><div class="ap-list-title">Print / Download PDF</div></div>
+        <i class="bi bi-chevron-right" style="color:var(--muted);"></i>
+    </a>
+
+    <button onclick="openSendSheet()" class="ap-list-item" style="border-radius:10px;border:1px solid var(--border);margin-bottom:8px;width:100%;background:none;cursor:pointer;">
+        <div class="ap-list-icon"><i class="bi bi-envelope"></i></div>
+        <div class="ap-list-content"><div class="ap-list-title">Send Invoice by Email</div></div>
+        <i class="bi bi-chevron-right" style="color:var(--muted);"></i>
+    </button>
+
+    {% if invoice.status != 'cancelled' %}
+    <button onclick="openCancelConfirm()" class="ap-list-item" style="border-radius:10px;border:1px solid #fce8e8;margin-bottom:8px;width:100%;background:none;cursor:pointer;">
+        <div class="ap-list-icon" style="background:#fce8e8;"><i class="bi bi-x-circle" style="color:var(--danger);"></i></div>
+        <div class="ap-list-content"><div class="ap-list-title" style="color:var(--danger);">Cancel Invoice</div></div>
+    </button>
     {% endif %}
 
-    <div class="d-flex justify-content-between text-muted mt-3">
-        <div>
-            {% if invoice.work_completed_by %}
-            <small>Work completed by: {{ invoice.work_completed_by.get_full_name }}</small><br>
-            {% endif %}
-            {% if invoice.created_by %}
-            <small>Generated by: {{ invoice.created_by.get_full_name }}</small>
-            {% endif %}
-        </div>
-        <p>Thank you for your business</p>
+    <form method="post" action="{% url 'invoice_delete' invoice.pk %}" id="delete-form" onsubmit="return false;">
+        {% csrf_token %}
+        <button type="button" onclick="openDeleteConfirm()" class="ap-list-item" style="border-radius:10px;border:1px solid #fce8e8;width:100%;background:none;cursor:pointer;">
+            <div class="ap-list-icon" style="background:#fce8e8;"><i class="bi bi-trash" style="color:var(--danger);"></i></div>
+            <div class="ap-list-content"><div class="ap-list-title" style="color:var(--danger);">Delete Invoice</div></div>
+        </button>
+    </form>
+
+    <button onclick="closeActions()" class="ap-btn ap-btn-outline ap-btn-full" style="margin-top:8px;">Close</button>
+</div>
+
+<!-- CANCEL CONFIRM SHEET -->
+<div class="ap-overlay" id="cancel-overlay" onclick="closeCancelConfirm()"></div>
+<div class="ap-sheet" id="cancel-sheet">
+    <span class="ap-sheet-handle"></span>
+    <div style="text-align:center;padding:8px 0 16px;">
+        <i class="bi bi-exclamation-triangle-fill" style="font-size:36px;color:#f57f17;display:block;margin-bottom:10px;"></i>
+        <div style="font-size:16px;font-weight:700;margin-bottom:8px;">Cancel this invoice?</div>
+        <div style="font-size:14px;color:var(--muted);">Are you sure you want to cancel this invoice and all tasks?</div>
+    </div>
+    <div class="ap-sheet-actions">
+        <form method="post" action="{% url 'invoice_action' invoice.pk %}" style="flex:1;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="cancel">
+            <button type="submit" class="ap-btn ap-btn-danger ap-btn-full">Cancel Invoice</button>
+        </form>
+        <button onclick="closeCancelConfirm()" class="ap-btn ap-btn-outline" style="flex:1;">Keep It</button>
     </div>
 </div>
+
+<!-- DELETE CONFIRM SHEET -->
+<div class="ap-overlay" id="delete-overlay" onclick="closeDeleteConfirm()"></div>
+<div class="ap-sheet" id="delete-sheet">
+    <span class="ap-sheet-handle"></span>
+    <div style="text-align:center;padding:8px 0 16px;">
+        <i class="bi bi-trash-fill" style="font-size:36px;color:var(--danger);display:block;margin-bottom:10px;"></i>
+        <div style="font-size:16px;font-weight:700;margin-bottom:8px;">Delete this invoice?</div>
+        <div style="font-size:14px;color:var(--muted);">This action cannot be undone.</div>
+    </div>
+    <div class="ap-sheet-actions">
+        <form method="post" action="{% url 'invoice_delete' invoice.pk %}" style="flex:1;">
+            {% csrf_token %}
+            <button type="submit" class="ap-btn ap-btn-danger ap-btn-full">Delete</button>
+        </form>
+        <button onclick="closeDeleteConfirm()" class="ap-btn ap-btn-outline" style="flex:1;">Cancel</button>
+    </div>
+</div>
+
+<!-- SEND EMAIL SHEET -->
+<div class="ap-overlay" id="send-overlay" onclick="closeSendSheet()"></div>
+<div class="ap-sheet" id="send-sheet">
+    <span class="ap-sheet-handle"></span>
+    <div class="ap-sheet-title">Send Invoice #{{ invoice.invoice_number }}</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;text-align:center;">Edit email addresses before sending</p>
+    <form method="post" action="{% url 'invoice_action' invoice.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="send">
+        <div id="email-list">
+            {% if invoice.customer %}
+                {% for email in invoice.customer.get_all_emails %}
+                <div class="email-row" style="display:flex;gap:8px;margin-bottom:8px;">
+                    <input type="email" name="emails" value="{{ email }}" class="form-control" style="flex:1;">
+                    <button type="button" class="ap-btn ap-btn-danger ap-btn-sm" onclick="removeEmail(this)"><i class="bi bi-x"></i></button>
+                </div>
+                {% empty %}
+                <div class="email-row" style="display:flex;gap:8px;margin-bottom:8px;">
+                    <input type="email" name="emails" value="" class="form-control" placeholder="Enter email" style="flex:1;">
+                    <button type="button" class="ap-btn ap-btn-danger ap-btn-sm" onclick="removeEmail(this)"><i class="bi bi-x"></i></button>
+                </div>
+                {% endfor %}
+            {% else %}
+            <div class="email-row" style="display:flex;gap:8px;margin-bottom:8px;">
+                <input type="email" name="emails" value="" class="form-control" placeholder="Enter email" style="flex:1;">
+                <button type="button" class="ap-btn ap-btn-danger ap-btn-sm" onclick="removeEmail(this)"><i class="bi bi-x"></i></button>
+            </div>
+            {% endif %}
+        </div>
+        <button type="button" onclick="addEmail()" class="ap-btn ap-btn-outline ap-btn-sm" style="margin-bottom:16px;">
+            <i class="bi bi-plus"></i> Add Email
+        </button>
+        <div class="ap-sheet-actions">
+            <button type="submit" class="ap-btn ap-btn-primary" style="flex:1;"><i class="bi bi-send"></i> Send</button>
+            <button type="button" onclick="closeSendSheet()" class="ap-btn ap-btn-outline" style="flex:1;">Cancel</button>
+        </div>
+    </form>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
-function openSendModal() {
-    const modal = new bootstrap.Modal(document.getElementById('sendModal'));
-    modal.show();
+function openActions()       { openSheet('actions'); }
+function closeActions()      { closeSheet('actions'); }
+function openCancelConfirm() { closeActions(); setTimeout(()=>openSheet('cancel'), 200); }
+function closeCancelConfirm(){ closeSheet('cancel'); }
+function openDeleteConfirm() { closeActions(); setTimeout(()=>openSheet('delete'), 200); }
+function closeDeleteConfirm(){ closeSheet('delete'); }
+function openSendSheet()     { closeActions(); setTimeout(()=>openSheet('send'), 200); }
+function closeSendSheet()    { closeSheet('send'); }
+
+function openSheet(name) {
+    document.getElementById(name+'-overlay').classList.add('open');
+    document.getElementById(name+'-sheet').classList.add('open');
+}
+function closeSheet(name) {
+    document.getElementById(name+'-overlay').classList.remove('open');
+    document.getElementById(name+'-sheet').classList.remove('open');
 }
 
 function removeEmail(btn) {
-    const row = btn.closest('.email-row');
-    const list = document.getElementById('email-list');
-    if (list.querySelectorAll('.email-row').length > 1) {
-        row.remove();
-    } else {
-        row.querySelector('input').value = '';
-    }
+    var row = btn.closest('.email-row');
+    var list = document.getElementById('email-list');
+    if (list.querySelectorAll('.email-row').length > 1) row.remove();
+    else row.querySelector('input').value = '';
 }
-
 function addEmail() {
-    const list = document.getElementById('email-list');
-    const row = document.createElement('div');
-    row.className = 'input-group mb-2 email-row';
-    row.innerHTML = `
-        <input type="email" name="emails" value="" class="form-control" placeholder="Enter email">
-        <button type="button" class="btn btn-outline-danger" onclick="removeEmail(this)">✕</button>
-    `;
+    var list = document.getElementById('email-list');
+    var row = document.createElement('div');
+    row.className = 'email-row';
+    row.style = 'display:flex;gap:8px;margin-bottom:8px;';
+    row.innerHTML = '<input type="email" name="emails" value="" class="form-control" placeholder="Enter email" style="flex:1;"><button type="button" class="ap-btn ap-btn-danger ap-btn-sm" onclick="removeEmail(this)"><i class="bi bi-x"></i></button>';
     list.appendChild(row);
 }
 </script>

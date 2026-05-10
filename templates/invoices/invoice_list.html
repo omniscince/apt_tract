@@ -1,79 +1,122 @@
 {% extends 'base.html' %}
 {% block title %}Invoices - AutoPro{% endblock %}
-{% block page_title %}Invoices{% endblock %}
+{% block page_title %}
+    {% with status=request.GET.status %}
+        {% if status == 'final' %}Final Invoices
+        {% elif status == 'cancelled' %}Cancelled Invoices
+        {% else %}Draft Invoices{% endif %}
+    {% endwith %}
+{% endblock %}
+{% block desktop_page_title %}Invoices{% endblock %}
+
+{% block back_link %}
+<a href="{% url 'dashboard' %}" class="hdr-back"><i class="bi bi-chevron-left"></i> Back</a>
+{% endblock %}
+
 {% block content %}
 
-<div class="card p-3 mb-4">
-    <form method="get" class="row g-2 align-items-end">
-        <div class="col-md-2">
-            <label class="form-label">Invoice #</label>
-            <input type="text" name="q" class="form-control" placeholder="Search..." value="{{ request.GET.q }}">
-        </div>
-        <div class="col-md-2">
-            <label class="form-label">Customer</label>
-            <select name="customer" class="form-control">
-                <option value="">All</option>
-                {% for c in customers %}
-                <option value="{{ c.pk }}" {% if request.GET.customer == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        {% if user.role == 'owner' %}
-        <div class="col-md-2">
-            <label class="form-label">Staff</label>
-            <select name="staff" class="form-control">
-                <option value="">All</option>
-                {% for s in staff_list %}
-                <option value="{{ s.pk }}" {% if request.GET.staff == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.get_full_name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        {% endif %}
-        <div class="col-md-2">
-            <label class="form-label">VIN</label>
-            <input type="text" name="vin" class="form-control" placeholder="VIN" value="{{ request.GET.vin }}">
-        </div>
-        <div class="col-md-1">
-            <label class="form-label">Month</label>
-            <input type="number" name="month" class="form-control" placeholder="1-12" value="{{ request.GET.month }}" min="1" max="12">
-        </div>
-        <div class="col-md-1">
-            <label class="form-label">Year</label>
-            <input type="number" name="year" class="form-control" placeholder="2026" value="{{ request.GET.year }}">
-        </div>
-        <div class="col-md-2">
-            <label class="form-label">Status</label>
-            <select name="status" class="form-control">
-                <option value="">All</option>
-                <option value="draft" {% if request.GET.status == 'draft' %}selected{% endif %}>Draft</option>
-                <option value="final" {% if request.GET.status == 'final' %}selected{% endif %}>Final</option>
-                <option value="cancelled" {% if request.GET.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
-            </select>
-        </div>
-        <div class="col-md-12 d-flex gap-2">
-            <button type="submit" class="btn btn-primary">Filter</button>
-            <a href="{% url 'invoice_list' %}" class="btn btn-outline-secondary">Reset</a>
+<!-- ═══════════════════════  MOBILE  ═══════════════════════ -->
+<div id="mobile-view">
 
-            <a href="{% url 'invoice_create' %}" class="btn btn-success ms-auto">+ New Invoice</a>
+    <div class="date-nav">
+        <button class="date-nav-btn" id="prev-date"><i class="bi bi-chevron-left"></i></button>
+        <button id="date-label-btn"
+                style="background:none;border:none;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--text);">
+            {{ current_date_display }}
+        </button>
+        <button class="date-nav-btn" id="next-date"><i class="bi bi-chevron-right"></i></button>
+    </div>
+
+    <div class="ap-card" style="border-radius:0;border-left:none;border-right:none;border-top:none;">
+        {% for inv in invoices %}
+        <a href="{% url 'invoice_detail' inv.pk %}" class="ap-list-item">
+            <div class="ap-list-icon">
+                <i class="bi bi-{% if inv.email_sent %}envelope-check-fill{% else %}envelope{% endif %}"
+                   style="color:{% if inv.email_sent %}var(--success){% else %}var(--muted){% endif %};"></i>
+            </div>
+            <div class="ap-list-content">
+                <div class="ap-list-title">{{ inv.invoice_number }} <small style="color:var(--muted);font-weight:400;">{{ inv.get_customer_display }}</small></div>
+                <div class="ap-list-sub">{{ inv.get_car_display|truncatechars:30 }}</div>
+            </div>
+            <div class="ap-list-right">
+                <div class="ap-list-amount">${{ inv.total }}</div>
+                <div style="font-size:11px;color:var(--muted);">{{ inv.invoice_date|date:"M d" }}</div>
+            </div>
+        </a>
+        {% empty %}
+        <div style="padding:48px 16px;text-align:center;color:var(--muted);">
+            <i class="bi bi-inbox" style="font-size:40px;display:block;margin-bottom:10px;"></i>
+            No {% with status=request.GET.status %}{% if status == 'final' %}finalized{% elif status == 'cancelled' %}cancelled{% else %}draft{% endif %}{% endwith %} invoices for the selected date
         </div>
-    </form>
+        {% endfor %}
+    </div>
+
+    <!-- Tab bar: z-index 199, sits above bottom-nav (200 is fine, tabs are inside page flow) -->
+    <div id="invoice-tabs">
+        <button class="invoice-tab-btn {% if request.GET.sent == '' or not request.GET.sent %}tab-active{% endif %}"
+                onclick="switchSent('')">All</button>
+        <button class="invoice-tab-btn {% if request.GET.sent == '1' %}tab-active{% endif %}"
+                onclick="switchSent('1')">Sent</button>
+        <button class="invoice-tab-btn {% if request.GET.sent == '0' %}tab-active{% endif %}"
+                onclick="switchSent('0')">Not Sent</button>
+    </div>
 </div>
 
-<div class="card">
-    <div class="table-responsive">
-        <table class="table table-hover mb-0">
-            <thead class="table-light">
+<!-- ═══════════════════════  DESKTOP  ═══════════════════════ -->
+<div id="desktop-view">
+    <div class="ap-card" style="padding:16px;margin-bottom:16px;">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-2">
+                <label class="form-label">Invoice #</label>
+                <input type="text" name="q" class="form-control" placeholder="Search…" value="{{ request.GET.q }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Customer</label>
+                <select name="customer" class="form-control">
+                    <option value="">All</option>
+                    {% for c in customers %}<option value="{{ c.pk }}" {% if request.GET.customer == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+                </select>
+            </div>
+            {% if user.role == 'owner' %}
+            <div class="col-md-2">
+                <label class="form-label">Staff</label>
+                <select name="staff" class="form-control">
+                    <option value="">All</option>
+                    {% for s in staff_list %}<option value="{{ s.pk }}" {% if request.GET.staff == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.get_full_name }}</option>{% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <div class="col-md-1">
+                <label class="form-label">Month</label>
+                <input type="number" name="month" class="form-control" placeholder="1-12" value="{{ request.GET.month }}" min="1" max="12">
+            </div>
+            <div class="col-md-1">
+                <label class="form-label">Year</label>
+                <input type="number" name="year" class="form-control" placeholder="2026" value="{{ request.GET.year }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Status</label>
+                <select name="status" class="form-control">
+                    <option value="">All</option>
+                    <option value="draft"     {% if request.GET.status == 'draft'     %}selected{% endif %}>Draft</option>
+                    <option value="final"     {% if request.GET.status == 'final'     %}selected{% endif %}>Final</option>
+                    <option value="cancelled" {% if request.GET.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Filter</button>
+                <a href="{% url 'invoice_list' %}" class="btn btn-outline-secondary">Reset</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="ap-card">
+        <table class="ap-table">
+            <thead>
                 <tr>
-                    <th>Invoice #</th>
-                    <th>Customer</th>
-                    <th>Car</th>
-                    <th>Date</th>
-                    <th class="text-end">Subtotal</th>
-                    <th class="text-end">Total</th>
-                    <th>Work Completed By</th>
-                    <th>Sent</th>
-                    <th>Status</th>
-                    <th></th>
+                    <th>Invoice #</th><th>Customer</th><th>Car</th>
+                    <th>Date</th><th>Subtotal</th><th>Total</th>
+                    <th>Created By</th><th>Status</th><th></th>
                 </tr>
             </thead>
             <tbody>
@@ -82,78 +125,99 @@
                     <td><strong>{{ inv.invoice_number }}</strong></td>
                     <td>{{ inv.get_customer_display }}</td>
                     <td>{{ inv.get_car_display|truncatechars:25 }}</td>
-                    <td>{{ inv.invoice_date|date:"N j, Y" }}</td>
-                    <td class="text-end">${{ inv.subtotal }}</td>
-                    <td class="text-end"><strong>${{ inv.total }}</strong></td>
-                    <td>{{ inv.work_completed_by.get_full_name|default:'-' }}</td>
-                     <td style='text-align:center;'>{% if inv.email_sent %}<span style='color:green;font-weight:bold;'>✓</span>{% else %}<span style='color:#ccc;'>–</span>{% endif %}</td>
-                    <td>
-                        {% if inv.status == 'final' %}
-                        <span class="badge bg-success">Final</span>
-                        {% elif inv.status == 'cancelled' %}
-                        <span class="badge bg-danger">Cancelled</span>
-                        {% else %}
-                        <span class="badge bg-secondary">Draft</span>
-                        {% endif %}
-                    </td>
-                    <td class="d-flex gap-1">
-                        <a href="{% url 'invoice_detail' inv.pk %}" class="btn btn-sm btn-outline-secondary">👁</a>
-                        <a href="{% url 'invoice_edit' inv.pk %}" class="btn btn-sm btn-outline-primary">✏️</a>
-                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="showDeleteModal({{ inv.pk }}, '{{ inv.invoice_number }}')">🗑</button>
-                    </td>
+                    <td>{{ inv.invoice_date|date:"m/d/Y" }}</td>
+                    <td>${{ inv.subtotal }}</td>
+                    <td><strong>${{ inv.total }}</strong></td>
+                    <td>{{ inv.created_by.get_full_name|default:'-' }}</td>
+                    <td><span class="ap-badge badge-{{ inv.status }}">{{ inv.status|upper }}</span></td>
+                    <td><a href="{% url 'invoice_detail' inv.pk %}" class="ap-btn ap-btn-outline ap-btn-sm">View</a></td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="9" class="text-center text-muted py-4">No invoices found</td></tr>
+                <tr><td colspan="9" style="text-align:center;color:var(--muted);padding:32px;">No invoices found</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
 
-<div id="delete-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
-    <div class="card p-4" style="max-width:400px;width:90%;">
-        <h5>Delete Invoice</h5>
-        <p>Are you sure you want to delete invoice <strong id="delete-name"></strong>?</p>
-        <div class="d-flex gap-2 justify-content-end">
-            <button class="btn btn-outline-secondary" onclick="document.getElementById('delete-modal').style.display='none'">Cancel</button>
-            <form id="delete-form" method="post">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-danger">Delete</button>
-            </form>
-        </div>
-    </div>
-</div>
+{% if user.role in 'owner,staff' %}
+<!-- fab-above-tabs pushes the button above the Draft/Final/Cancelled bar on mobile -->
+<a href="{% url 'invoice_create' %}" class="fab fab-above-tabs"><i class="bi bi-plus"></i></a>
+{% endif %}
 
 {% endblock %}
 
 {% block scripts %}
+<style>
+.invoice-tab-btn {
+    flex: 1; border: none; background: transparent; padding: 12px 8px;
+    font-size: 13px; font-weight: 600; font-family: 'DM Sans', sans-serif;
+    color: var(--muted); cursor: pointer;
+    border-top: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+}
+.invoice-tab-btn.tab-active { color: var(--brand); border-top-color: var(--brand); }
+
+/* Tab bar fixed just above bottom-nav */
+#invoice-tabs {
+    position: fixed;
+    bottom: var(--bottom-h);
+    left: 0; right: 0;
+    height: 48px;
+    background: #fff;
+    border-top: 1px solid var(--border);
+    display: flex;
+    z-index: 199;
+}
+
+@media (max-width: 767px) {
+    #desktop-view { display: none; }
+    #mobile-view  { display: block; }
+    /* Extra bottom padding so last list item isn't hidden under tab bar */
+    .app-body { padding-bottom: calc(var(--bottom-h) + 48px + 8px) !important; }
+}
+@media (min-width: 768px) {
+    #mobile-view   { display: none; }
+    #desktop-view  { display: block; }
+    #invoice-tabs  { display: none !important; }
+    /* Reset extra padding on desktop */
+    .app-body { padding-bottom: 0 !important; }
+    /* FAB not needed on desktop (filter + New Invoice button in form) */
+    .fab { display: none !important; }
+}
+</style>
 <script>
-function showDeleteModal(pk, name) {
-    document.getElementById('delete-name').textContent = name;
-    document.getElementById('delete-form').action = '/invoices/' + pk + '/delete/';
-    document.getElementById('delete-modal').style.display = 'flex';
+var currentDate = '{{ request.GET.date|default:"" }}';
+
+function switchSent(sent) {
+    var url = '{% url "invoice_list" %}';
+    var params = [];
+    if (sent !== '') params.push('sent=' + sent);
+    if (currentDate) params.push('date=' + currentDate);
+    if (params.length) url += '?' + params.join('&');
+    window.location.href = url;
 }
-
-// Save/restore filters
-const filterKey = 'invoice_filters';
-const form = document.querySelector('form[method="get"]');
-
-if (!window.location.search) {
-    const saved = localStorage.getItem(filterKey);
-    if (saved) {
-        window.location.search = saved;
-    }
+function getTodayStr() {
+    return new Date().toISOString().split('T')[0];
 }
-
-if (form) {
-    form.addEventListener('submit', function() {
-        const params = new URLSearchParams(new FormData(form));
-        localStorage.setItem(filterKey, params.toString());
-    });
+function navigateDate(dateStr) {
+    var sent = '{{ request.GET.sent|default:"" }}';
+    var url = '{% url "invoice_list" %}?date=' + dateStr;
+    if (sent !== '') url += '&sent=' + sent;
+    window.location.href = url;
 }
-
-document.querySelector('a[href$="invoices/"]') && document.querySelector('a[href$="invoices/"]').addEventListener('click', function() {
-    localStorage.removeItem(filterKey);
+document.getElementById('prev-date').addEventListener('click', function () {
+    var base = currentDate || getTodayStr();
+    var d = new Date(base + 'T00:00:00'); d.setDate(d.getDate() - 1);
+    navigateDate(d.toISOString().split('T')[0]);
+});
+document.getElementById('next-date').addEventListener('click', function () {
+    var base = currentDate || getTodayStr();
+    var d = new Date(base + 'T00:00:00'); d.setDate(d.getDate() + 1);
+    navigateDate(d.toISOString().split('T')[0]);
+});
+document.getElementById('date-label-btn').addEventListener('click', function () {
+    navigateDate(getTodayStr());
 });
 </script>
 {% endblock %}

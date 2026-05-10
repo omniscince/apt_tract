@@ -1,42 +1,12 @@
 {% extends 'base.html' %}
 {% block title %}Cars - AutoPro{% endblock %}
-
-{% block scripts %}
-<script>
-const vinInput = document.getElementById('vin-search');
-const vinSuggestions = document.getElementById('vin-suggestions');
-
-vinInput.addEventListener('input', function() {
-    const q = this.value.trim();
-    if (q.length < 2) { vinSuggestions.style.display = 'none'; return; }
-    fetch(`/cars/search/vin/?q=${encodeURIComponent(q)}`)
-        .then(r => r.json())
-        .then(data => {
-            vinSuggestions.innerHTML = '';
-            if (!data.results.length) { vinSuggestions.style.display = 'none'; return; }
-            data.results.forEach(c => {
-                const item = document.createElement('button');
-                item.type = 'button';
-                item.className = 'list-group-item list-group-item-action';
-                item.innerHTML = `<strong>${c.vin}</strong> — ${c.make} ${c.model} <small class="text-muted">${c.customer}</small>`;
-                item.addEventListener('click', function() {
-                    vinInput.value = c.vin;
-                    vinSuggestions.style.display = 'none';
-                });
-                vinSuggestions.appendChild(item);
-            });
-            vinSuggestions.style.display = 'block';
-        });
-});
-
-document.addEventListener('click', function(e) {
-    if (!vinInput.contains(e.target) && !vinSuggestions.contains(e.target)) {
-        vinSuggestions.style.display = 'none';
-    }
-});
-</script>
-{% endblock %}
 {% block page_title %}Cars{% endblock %}
+{% block desktop_page_title %}Cars{% endblock %}
+
+{% block back_link %}
+<a href="{% url 'dashboard' %}" class="hdr-back"><i class="bi bi-chevron-left"></i> Back</a>
+{% endblock %}
+
 {% block content %}
 
 <div class="card p-3 mb-4">
@@ -47,10 +17,7 @@ document.addEventListener('click', function(e) {
         </div>
         <div class="col-md-3">
             <label class="form-label">Search by VIN</label>
-            <div class="position-relative">
-                <input type="text" name="vin" id="vin-search" class="form-control" placeholder="VIN number" value="{{ vin }}" autocomplete="off">
-                <div id="vin-suggestions" class="list-group position-absolute w-100" style="z-index:1000;display:none;"></div>
-            </div>
+            <input type="text" name="vin" class="form-control" placeholder="VIN number" value="{{ vin }}">
         </div>
         <div class="col-md-3">
             <label class="form-label">Search by Stock #</label>
@@ -61,7 +28,33 @@ document.addEventListener('click', function(e) {
             <a href="{% url 'car_list' %}" class="btn btn-outline-secondary">Reset</a>
         </div>
     </form>
+
+<div style="padding:10px 16px;background:#fff;border-bottom:1px solid var(--border);">
+    <form method="get" style="display:flex;gap:8px;">
+        <input type="text" name="q" class="form-control" placeholder="Search VIN, make, model…" value="{{ request.GET.q }}" style="flex:1;">
+        <button type="submit" class="ap-btn ap-btn-primary ap-btn-sm"><i class="bi bi-search"></i></button>
+    </form>
 </div>
+
+<div class="ap-card" style="border-radius:0;border-left:none;border-right:none;border-top:none;">
+    {% for car in cars %}
+    <div class="ap-list-item">
+        <div class="ap-list-icon"><i class="bi bi-car-front-fill"></i></div>
+        <div class="ap-list-content">
+            <div class="ap-list-title">{{ car.make }} {{ car.model }}{% if car.year %} ({{ car.year }}){% endif %}</div>
+            <div class="ap-list-sub">
+                {% if car.vin %}VIN: {{ car.vin }}{% endif %}
+                {% if car.customer %} · {{ car.customer.name }}{% endif %}
+            </div>
+        </div>
+        {% if user.role in 'owner,staff' %}
+        <a href="{% url 'car_edit' car.pk %}" class="ap-btn ap-btn-outline ap-btn-sm">Edit</a>
+        {% endif %}
+    </div>
+    {% empty %}
+    <div style="padding:48px 16px;text-align:center;color:var(--muted);">
+        <i class="bi bi-car-front" style="font-size:40px;display:block;margin-bottom:10px;"></i>
+        No cars yet
 
 <div class="card">
     <div class="table-responsive">
@@ -89,7 +82,7 @@ document.addEventListener('click', function(e) {
                     <td>{{ car.vin|default:'-' }}</td>
                     <td>
                         {% with last=car.get_last_invoice_date %}
-                        {% if last %}{{ last|date:"N j, Y" }}{% else %}-{% endif %}
+                        {% if last %}{{ last|date:"m/d/Y" }}{% else %}-{% endif %}
                         {% endwith %}
                     </td>
                     <td class="d-flex gap-1">
@@ -108,5 +101,10 @@ document.addEventListener('click', function(e) {
             </tbody>
         </table>
     </div>
+    {% endfor %}
 </div>
+
+{% if user.role in 'owner,staff' %}
+<a href="{% url 'car_create' %}" class="fab"><i class="bi bi-plus"></i></a>
+{% endif %}
 {% endblock %}
