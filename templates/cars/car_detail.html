@@ -36,8 +36,16 @@
                     <div>
                         <strong>{{ inv.invoice_number }}</strong>
                         <small class="text-muted ms-2">{{ inv.invoice_date|date:"N j, Y" }}</small>
+                        {% if inv.work_completed_by %}
+                        <small class="text-muted ms-2">by {{ inv.work_completed_by.get_full_name|default:inv.work_completed_by.email }}</small>
+                        {% endif %}
                     </div>
                     <div class="d-flex align-items-center gap-2">
+                        {% if inv.email_sent %}
+                        <span title="Email sent" style="color:green;">&#10003;</span>
+                        {% else %}
+                        <span title="Email not sent" style="color:#aaa;">&#8211;</span>
+                        {% endif %}
                         <strong>${{ inv.total }}</strong>
                         <a href="{% url 'invoice_detail' inv.pk %}" class="btn btn-sm btn-outline-primary">View</a>
                     </div>

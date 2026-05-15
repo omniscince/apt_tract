@@ -117,9 +117,9 @@ class DashboardView(View):
             if date_to:
                 invoices_qs = invoices_qs.filter(invoice_date__lte=date_to)
 
-        if customer_id:
+        if customer_id and customer_id.isdigit():
             invoices_qs = invoices_qs.filter(customer_id=customer_id)
-        if staff_id and user.role == 'owner':
+        if staff_id and staff_id.isdigit() and user.role == 'owner':
             invoices_qs = invoices_qs.filter(
                 models.Q(created_by_id=staff_id) | models.Q(work_completed_by_id=staff_id)
             )
