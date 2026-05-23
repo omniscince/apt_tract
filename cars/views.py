@@ -15,10 +15,7 @@ class CarListView(View):
         q = request.GET.get('q', '')
         vin = request.GET.get('vin', '')
         stock = request.GET.get('stock', '')
-        if request.user.role == 'staff' and not vin and not q and not stock:
-            cars = Car.objects.none()
-        else:
-            cars = Car.objects.all().select_related('customer')
+        cars = Car.objects.all().select_related('customer')
         customer_id = request.GET.get('customer')
 
         if q:

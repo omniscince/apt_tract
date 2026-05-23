@@ -46,3 +46,21 @@ class UserCreateForm(forms.ModelForm):
         else:
             self.fields['password'].required = True
             self.fields['password'].widget.attrs['placeholder'] = 'Password'
+
+class ProfileForm(forms.ModelForm):
+    password = forms.CharField(
+        required=False,
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'New password (leave blank to keep current)'
+        }),
+    )
+
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'phone', 'password']
+        widgets = {
+            'first_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control'}),
+        }

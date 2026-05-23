@@ -4,7 +4,7 @@
 {% block desktop_page_title %}Invoice #{{ invoice.invoice_number }}{% endblock %}
 
 {% block back_link %}
-<a href="{% url 'invoice_list' %}" class="hdr-back"><i class="bi bi-chevron-left"></i> Back</a>
+<a href="#" onclick="history.back();return false;" class="hdr-back"><i class="bi bi-chevron-left"></i> Back</a>
 {% endblock %}
 
 {% block content %}
@@ -141,14 +141,14 @@
         <i class="bi bi-chevron-right" style="color:var(--muted);"></i>
     </a>
 
-    <button onclick="openSendSheet()" class="ap-list-item" style="border-radius:10px;border:1px solid var(--border);margin-bottom:8px;width:100%;background:none;cursor:pointer;">
+    <button onclick="openSendSheet()" class="ap-list-item" style="border-radius:10px;border:1px solid var(--border);margin-bottom:8px;width:100%;background:none;cursor:pointer;text-align:left;">
         <div class="ap-list-icon"><i class="bi bi-envelope"></i></div>
         <div class="ap-list-content"><div class="ap-list-title">Send Invoice by Email</div></div>
         <i class="bi bi-chevron-right" style="color:var(--muted);"></i>
     </button>
 
     {% if invoice.status != 'cancelled' %}
-    <button onclick="openCancelConfirm()" class="ap-list-item" style="border-radius:10px;border:1px solid #fce8e8;margin-bottom:8px;width:100%;background:none;cursor:pointer;">
+    <button onclick="openCancelConfirm()" class="ap-list-item" style="border-radius:10px;border:1px solid #fce8e8;margin-bottom:8px;width:100%;background:none;cursor:pointer;text-align:left;">
         <div class="ap-list-icon" style="background:#fce8e8;"><i class="bi bi-x-circle" style="color:var(--danger);"></i></div>
         <div class="ap-list-content"><div class="ap-list-title" style="color:var(--danger);">Cancel Invoice</div></div>
     </button>
@@ -156,7 +156,7 @@
 
     <form method="post" action="{% url 'invoice_delete' invoice.pk %}" id="delete-form" onsubmit="return false;">
         {% csrf_token %}
-        <button type="button" onclick="openDeleteConfirm()" class="ap-list-item" style="border-radius:10px;border:1px solid #fce8e8;width:100%;background:none;cursor:pointer;">
+        <button type="button" onclick="openDeleteConfirm()" class="ap-list-item" style="border-radius:10px;border:1px solid #fce8e8;width:100%;background:none;cursor:pointer;text-align:left;">
             <div class="ap-list-icon" style="background:#fce8e8;"><i class="bi bi-trash" style="color:var(--danger);"></i></div>
             <div class="ap-list-content"><div class="ap-list-title" style="color:var(--danger);">Delete Invoice</div></div>
         </button>
@@ -204,30 +204,32 @@
 
 <!-- SEND EMAIL SHEET -->
 <div class="ap-overlay" id="send-overlay" onclick="closeSendSheet()"></div>
-<div class="ap-sheet" id="send-sheet">
+<div class="ap-sheet" id="send-sheet" style="max-height:85vh;overflow-y:auto;">
     <span class="ap-sheet-handle"></span>
     <div class="ap-sheet-title">Send Invoice #{{ invoice.invoice_number }}</div>
     <p style="font-size:13px;color:var(--muted);margin-bottom:14px;text-align:center;">Edit email addresses before sending</p>
-    <form method="post" action="{% url 'invoice_action' invoice.pk %}">
+    <form method="post" action="{% url 'invoice_action' invoice.pk %}" id="send-form">
         {% csrf_token %}
         <input type="hidden" name="action" value="send">
         <div id="email-list">
             {% if invoice.customer %}
                 {% for email in invoice.customer.get_all_emails %}
-                <div class="email-row" style="display:flex;gap:8px;margin-bottom:8px;">
+                <div class="email-row" style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
                     <input type="email" name="emails" value="{{ email }}" class="form-control" style="flex:1;">
-                    <button type="button" class="ap-btn ap-btn-danger ap-btn-sm" onclick="removeEmail(this)"><i class="bi bi-x"></i></button>
+                    <button type="button" class="ap-btn ap-btn-danger ap-btn-sm" onclick="removeEmail(this)" title="Remove"><i class="bi bi-x"></i></button>
                 </div>
                 {% empty %}
-                <div class="email-row" style="display:flex;gap:8px;margin-bottom:8px;">
+                <div class="email-row" style="display:flex;gap:8px;margin-bottom:8px;align-items:center;" data-new="1">
                     <input type="email" name="emails" value="" class="form-control" placeholder="Enter email" style="flex:1;">
-                    <button type="button" class="ap-btn ap-btn-danger ap-btn-sm" onclick="removeEmail(this)"><i class="bi bi-x"></i></button>
+                    <button type="button" class="ap-btn ap-btn-outline ap-btn-sm" onclick="saveEmail(this)" title="Save to customer"><i class="bi bi-person-check"></i></button>
+                    <button type="button" class="ap-btn ap-btn-danger ap-btn-sm" onclick="removeEmail(this)" title="Remove"><i class="bi bi-x"></i></button>
                 </div>
                 {% endfor %}
             {% else %}
-            <div class="email-row" style="display:flex;gap:8px;margin-bottom:8px;">
+            <div class="email-row" style="display:flex;gap:8px;margin-bottom:8px;align-items:center;" data-new="1">
                 <input type="email" name="emails" value="" class="form-control" placeholder="Enter email" style="flex:1;">
-                <button type="button" class="ap-btn ap-btn-danger ap-btn-sm" onclick="removeEmail(this)"><i class="bi bi-x"></i></button>
+                <button type="button" class="ap-btn ap-btn-outline ap-btn-sm" onclick="saveEmail(this)" title="Save to customer"><i class="bi bi-person-check"></i></button>
+                <button type="button" class="ap-btn ap-btn-danger ap-btn-sm" onclick="removeEmail(this)" title="Remove"><i class="bi bi-x"></i></button>
             </div>
             {% endif %}
         </div>
@@ -273,9 +275,39 @@ function addEmail() {
     var list = document.getElementById('email-list');
     var row = document.createElement('div');
     row.className = 'email-row';
-    row.style = 'display:flex;gap:8px;margin-bottom:8px;';
-    row.innerHTML = '<input type="email" name="emails" value="" class="form-control" placeholder="Enter email" style="flex:1;"><button type="button" class="ap-btn ap-btn-danger ap-btn-sm" onclick="removeEmail(this)"><i class="bi bi-x"></i></button>';
+    row.setAttribute('data-new', '1');
+    row.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;align-items:center;';
+    row.innerHTML = '<input type="email" name="emails" value="" class="form-control" placeholder="Enter email" style="flex:1;"><button type="button" class="ap-btn ap-btn-outline ap-btn-sm" onclick="saveEmail(this)" title="Save to customer"><i class="bi bi-person-check"></i></button><button type="button" class="ap-btn ap-btn-danger ap-btn-sm" onclick="removeEmail(this)"><i class="bi bi-x"></i></button>';
     list.appendChild(row);
+    row.querySelector('input').focus();
+}
+
+function saveEmail(btn) {
+    var row = btn.closest('.email-row');
+    var input = row.querySelector('input');
+    var email = input.value.trim();
+    if (!email) { showToast('Enter an email first'); return; }
+    {% if invoice.customer %}
+    var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    var formData = new FormData();
+    formData.append('email', email);
+    formData.append('csrfmiddlewaretoken', csrfToken);
+    fetch('/customers/{{ invoice.customer.pk }}/add-email/', {method:'POST', body:formData})
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+            if (data.success) {
+                btn.innerHTML = '<i class="bi bi-check"></i>';
+                btn.classList.remove('ap-btn-outline');
+                btn.classList.add('ap-btn-success');
+                btn.disabled = true;
+                showToast('Email saved to customer!');
+            } else {
+                showToast(data.error || 'Error saving email');
+            }
+        });
+    {% else %}
+    showToast('No customer linked to this invoice');
+    {% endif %}
 }
 </script>
 {% endblock %}

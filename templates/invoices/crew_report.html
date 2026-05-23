@@ -1,49 +1,73 @@
 {% extends 'base.html' %}
-{% block title %}Crew Report{% endblock %}
+{% block title %}Crew Report - AutoPro{% endblock %}
 {% block page_title %}Crew Report{% endblock %}
+{% block desktop_page_title %}Crew Report{% endblock %}
+
+{% block back_link %}
+<a href="#" onclick="history.back();return false;" class="hdr-back"><i class="bi bi-chevron-left"></i> Back</a>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid mt-4">
-    <form method="get" class="d-flex align-items-center gap-2 mb-4 flex-wrap">
-        <label class="mb-0">From</label>
-        <input type="date" name="start" value="{{ start }}" class="form-control" style="width:160px">
-        <label class="mb-0">To</label>
-        <input type="date" name="end" value="{{ end }}" class="form-control" style="width:160px">
-        <button type="submit" class="btn btn-primary">Run</button>
-        <a href="{% url 'crew_report' %}" class="btn btn-outline-secondary">Reset</a>
-    </form>
-    <div class="card">
-        <div class="card-body p-0">
-            <table class="table table-bordered mb-0">
-                <thead class="table-dark">
-                    <tr>
-                        <th>User</th>
-                        <th class="text-center">Number of Invoices</th>
-                        <th class="text-end">Sub Total</th>
-                        <th class="text-end">Gross Revenue</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in rows %}
-                    <tr>
-                        <td>{{ row.user.get_full_name|default:row.user.email }}</td>
-                        <td class="text-center">{{ row.count }}</td>
-                        <td class="text-end">${{ row.subtotal|floatformat:2 }}</td>
-                        <td class="text-end">${{ row.gross|floatformat:2 }}</td>
-                    </tr>
-                    {% empty %}
-                    <tr><td colspan="4" class="text-center text-muted py-3">No data</td></tr>
-                    {% endfor %}
-                </tbody>
-                <tfoot class="table-secondary fw-bold">
-                    <tr>
-                        <td>TOTAL</td>
-                        <td class="text-center">{{ total_count }}</td>
-                        <td class="text-end">${{ total_subtotal|floatformat:2 }}</td>
-                        <td class="text-end">${{ total_gross|floatformat:2 }}</td>
-                    </tr>
-                </tfoot>
-            </table>
+<div style="padding:16px;">
+    <div class="ap-card" style="margin-bottom:16px;">
+        <div class="ap-card-body">
+            <form method="get" style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;">
+                <div>
+                    <label class="ap-label">From</label>
+                    <input type="date" name="start" value="{{ start }}" class="form-control" style="width:160px;">
+                </div>
+                <div>
+                    <label class="ap-label">To</label>
+                    <input type="date" name="end" value="{{ end }}" class="form-control" style="width:160px;">
+                </div>
+                <button type="submit" class="ap-btn ap-btn-primary ap-btn-sm"><i class="bi bi-funnel"></i> Run</button>
+                <a href="{% url 'crew_report' %}" class="ap-btn ap-btn-outline ap-btn-sm">Reset</a>
+            </form>
         </div>
+    </div>
+
+    {% if rows %}
+    <div class="ap-card" style="margin-bottom:16px;">
+        <div class="ap-card-body" style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:14px;color:var(--muted);font-weight:600;">{{ total_count }} invoices total</span>
+            <span style="font-size:22px;font-weight:700;color:var(--success);">${{ total_gross|floatformat:2 }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="ap-card">
+        <table class="ap-table">
+            <thead>
+                <tr>
+                    <th>Staff</th>
+                    <th style="text-align:center;">Invoices</th>
+                    <th style="text-align:right;">Subtotal</th>
+                    <th style="text-align:right;">Gross Revenue</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td><strong>{{ row.user.get_full_name|default:row.user.email }}</strong></td>
+                    <td style="text-align:center;">{{ row.count }}</td>
+                    <td style="text-align:right;">${{ row.subtotal|floatformat:2 }}</td>
+                    <td style="text-align:right;font-weight:700;color:var(--success);">${{ row.gross|floatformat:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:32px;">No data</td></tr>
+                {% endfor %}
+            </tbody>
+            {% if rows %}
+            <tfoot>
+                <tr style="background:#f7f8fc;">
+                    <td style="font-weight:700;padding:12px 14px;">TOTAL</td>
+                    <td style="text-align:center;font-weight:700;padding:12px 14px;">{{ total_count }}</td>
+                    <td style="text-align:right;font-weight:700;padding:12px 14px;">${{ total_subtotal|floatformat:2 }}</td>
+                    <td style="text-align:right;font-weight:700;font-size:16px;color:var(--success);padding:12px 14px;">${{ total_gross|floatformat:2 }}</td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
     </div>
 </div>
 {% endblock %}

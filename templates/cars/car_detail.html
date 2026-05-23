@@ -1,65 +1,98 @@
 {% extends 'base.html' %}
-{% block title %}{{ car }} - AutoPro{% endblock %}
+{% block title %}{{ car.make }} {{ car.model }} - AutoPro{% endblock %}
 {% block page_title %}{{ car.make }} {{ car.model }}{% endblock %}
+{% block desktop_page_title %}{{ car.make }} {{ car.model }}{% endblock %}
+
+{% block back_link %}
+<a href="#" onclick="history.back();return false;" class="hdr-back"><i class="bi bi-chevron-left"></i> Back</a>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between mb-4">
-    <a href="{% url 'car_list' %}" class="btn btn-outline-secondary btn-sm">← Back</a>
-    <a href="{% url 'car_edit' car.pk %}" class="btn btn-outline-primary btn-sm">Edit</a>
-</div>
+<div class="page-inner">
 
-<div class="row g-4">
-    <div class="col-md-4">
-        <div class="card p-3">
-            <h5>Car Info</h5>
-            <hr>
-            <p><strong>Make:</strong> {{ car.make }}</p>
-            <p><strong>Model:</strong> {{ car.model|default:'-' }}</p>
-            <p><strong>Year:</strong> {{ car.year|default:'-' }}</p>
-            <p><strong>VIN:</strong> {{ car.vin|default:'-' }}</p>
-            <p><strong>Stock #:</strong> {{ car.stock_number|default:'-' }}</p>
-            <hr>
-            <p><strong>Owner:</strong>
-                <a href="{% url 'customer_detail' car.customer.pk %}">{{ car.customer.name }}</a>
-            </p>
-            {% if car.get_last_invoice_date %}
-            <p><strong>Last Invoice:</strong> {{ car.get_last_invoice_date|date:"N j, Y" }}</p>
-            {% endif %}
-        </div>
+    <!-- Action buttons -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <a href="{% url 'car_edit' car.pk %}" class="ap-btn ap-btn-outline ap-btn-sm">
+            <i class="bi bi-pencil"></i> Edit
+        </a>
+        {% if user.role in 'owner,staff' %}
+        <a href="{% url 'invoice_create' %}?customer={{ car.customer.pk }}" class="ap-btn ap-btn-primary ap-btn-sm" style="margin-left:auto;">
+            <i class="bi bi-plus-circle"></i> New Invoice
+        </a>
+        {% endif %}
     </div>
 
-    <div class="col-md-8">
-        <div class="card p-3">
-            <h5 class="mb-3">Invoice History</h5>
-            {% for inv in invoices %}
-            <div class="border-bottom py-2">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>{{ inv.invoice_number }}</strong>
-                        <small class="text-muted ms-2">{{ inv.invoice_date|date:"N j, Y" }}</small>
-                        {% if inv.work_completed_by %}
-                        <small class="text-muted ms-2">by {{ inv.work_completed_by.get_full_name|default:inv.work_completed_by.email }}</small>
-                        {% endif %}
-                    </div>
-                    <div class="d-flex align-items-center gap-2">
-                        {% if inv.email_sent %}
-                        <span title="Email sent" style="color:green;">&#10003;</span>
-                        {% else %}
-                        <span title="Email not sent" style="color:#aaa;">&#8211;</span>
-                        {% endif %}
-                        <strong>${{ inv.total }}</strong>
-                        <a href="{% url 'invoice_detail' inv.pk %}" class="btn btn-sm btn-outline-primary">View</a>
-                    </div>
+    <!-- Car Info -->
+    <div class="ap-card" style="margin-bottom:12px;">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border);">
+            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Car Info</div>
+            <div class="info-grid" style="padding:0;">
+                <div>
+                    <div class="info-label">Make</div>
+                    <div class="info-value">{{ car.make }}</div>
                 </div>
-                <div class="mt-1">
-                    {% for item in inv.items.all %}
-                    <small class="d-block text-muted">• {{ item.description }} — ${{ item.price }}</small>
-                    {% endfor %}
+                <div>
+                    <div class="info-label">Model</div>
+                    <div class="info-value">{{ car.model|default:'-' }}</div>
                 </div>
+                <div>
+                    <div class="info-label">Year</div>
+                    <div class="info-value">{{ car.year|default:'-' }}</div>
+                </div>
+                <div>
+                    <div class="info-label">VIN</div>
+                    <div class="info-value">{{ car.vin|default:'-' }}</div>
+                </div>
+                <div>
+                    <div class="info-label">Stock #</div>
+                    <div class="info-value">{{ car.stock_number|default:'-' }}</div>
+                </div>
+                {% if car.get_last_invoice_date %}
+                <div>
+                    <div class="info-label">Last Invoice</div>
+                    <div class="info-value">{{ car.get_last_invoice_date|date:"N j, Y" }}</div>
+                </div>
+                {% endif %}
             </div>
-            {% empty %}
-            <p class="text-muted">No invoice history</p>
-            {% endfor %}
         </div>
+        {% if car.customer %}
+        <div style="padding:12px 16px;display:flex;align-items:center;gap:10px;">
+            <i class="bi bi-person-fill" style="color:var(--brand);font-size:16px;"></i>
+            <a href="{% url 'customer_detail' car.customer.pk %}" style="font-size:14px;font-weight:600;color:var(--brand);text-decoration:none;">{{ car.customer.name }}</a>
+        </div>
+        {% endif %}
     </div>
+
+    <!-- Invoice History -->
+    <div class="ap-card" style="margin-bottom:80px;">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:14px;font-weight:700;">Invoice History</span>
+        </div>
+        {% for inv in invoices %}
+        <a href="{% url 'invoice_detail' inv.pk %}" class="ap-list-item">
+            <div class="ap-list-icon">
+                <i class="bi bi-{% if inv.email_sent %}envelope-check-fill{% else %}envelope{% endif %}"
+                   style="color:{% if inv.email_sent %}var(--success){% else %}var(--muted){% endif %};"></i>
+            </div>
+            <div class="ap-list-content">
+                <div class="ap-list-title">{{ inv.invoice_number }}</div>
+                <div class="ap-list-sub">
+                    {{ inv.invoice_date|date:"N j, Y" }}
+                    {% if inv.work_completed_by %} · by {{ inv.work_completed_by.get_full_name|default:inv.work_completed_by.email }}{% endif %}
+                </div>
+                {% for item in inv.items.all %}
+                <div style="font-size:11px;color:var(--muted);">• {{ item.description }} — ${{ item.price }}</div>
+                {% endfor %}
+            </div>
+            <div class="ap-list-right">
+                <div class="ap-list-amount">${{ inv.total }}</div>
+                <span class="ap-badge badge-{{ inv.status }}">{{ inv.status|upper }}</span>
+            </div>
+        </a>
+        {% empty %}
+        <div style="padding:24px;text-align:center;color:var(--muted);font-size:14px;">No invoice history</div>
+        {% endfor %}
+    </div>
+
 </div>
 {% endblock %}

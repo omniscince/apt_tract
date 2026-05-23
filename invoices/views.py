@@ -124,14 +124,19 @@ class DashboardView(View):
                 models.Q(created_by_id=staff_id) | models.Q(work_completed_by_id=staff_id)
             )
 
-        invoices_list = list(invoices_qs.select_related('customer', 'car', 'created_by'))
+        invoices_list = list(invoices_qs.select_related('customer', 'car', 'created_by', 'work_completed_by'))
         total_amount = sum(inv.total for inv in invoices_list)
+        my_invoices_today = [inv for inv in invoices_list if inv.work_completed_by_id == user.id or inv.created_by_id == user.id]
+        my_amount = sum(inv.total for inv in my_invoices_today)
+        my_count = len(my_invoices_today)
 
         from users.models import User as UserModel
         context = {
             'total_invoices': len(invoices_list),
             'total_customers': Customer.objects.count(),
             'total_amount': total_amount,
+            'my_amount': my_amount,
+            'my_count': my_count,
             'recent_invoices': invoices_list[:20],
             'period': period,
             'date_from': date_from,
@@ -147,27 +152,31 @@ class DashboardView(View):
 @method_decorator(login_required, name='dispatch')
 class InvoiceListView(View):
     def get(self, request):
+        from datetime import date, timedelta
         user = request.user
         if user.role == 'staff':
             invoices = Invoice.objects.filter(
                 models.Q(created_by=user) | models.Q(work_completed_by=user)
-            ).distinct().select_related('customer', 'car', 'created_by')
+            ).distinct().select_related('customer', 'car', 'created_by', 'work_completed_by')
         else:
-            invoices = Invoice.objects.all().select_related('customer', 'car', 'created_by')
+            invoices = Invoice.objects.all().select_related('customer', 'car', 'created_by', 'work_completed_by')
 
-        q = request.GET.get('q', '')
+        q           = request.GET.get('q', '')
         customer_id = request.GET.get('customer')
-        staff_id = request.GET.get('staff')
-        month = request.GET.get('month')
-        year = request.GET.get('year')
-        vin = request.GET.get('vin')
-        status = request.GET.get('status')
+        staff_id    = request.GET.get('staff')
+        month       = request.GET.get('month')
+        year        = request.GET.get('year')
+        vin         = request.GET.get('vin')
+        status      = request.GET.get('status')
+        sent        = request.GET.get('sent', '')
+        period      = request.GET.get('period', '')
+        specific_date = request.GET.get('date', '')
 
         if q:
             invoices = invoices.filter(invoice_number__icontains=q)
-        if customer_id:
+        if customer_id and customer_id.isdigit():
             invoices = invoices.filter(customer_id=customer_id)
-        if staff_id and user.role != 'staff':
+        if staff_id and staff_id.isdigit() and user.role != 'staff':
             invoices = invoices.filter(work_completed_by_id=staff_id)
         if month:
             invoices = invoices.filter(invoice_date__month=month)
@@ -177,14 +186,41 @@ class InvoiceListView(View):
             invoices = invoices.filter(car__vin__icontains=vin)
         if status:
             invoices = invoices.filter(status=status)
+        if sent == '1':
+            invoices = invoices.filter(email_sent=True)
+        elif sent == '0':
+            invoices = invoices.filter(email_sent=False)
+
+        today = date.today()
+        active_period = ''
+        current_date = ''
+
+        if period == 'today':
+            invoices = invoices.filter(invoice_date=today)
+            active_period = 'today'
+        elif period == 'week':
+            week_start = today - timedelta(days=today.weekday())
+            invoices = invoices.filter(invoice_date__gte=week_start, invoice_date__lte=today)
+            active_period = 'week'
+        elif period == 'month':
+            invoices = invoices.filter(invoice_date__year=today.year, invoice_date__month=today.month)
+            active_period = 'month'
+        elif specific_date:
+            invoices = invoices.filter(invoice_date=specific_date)
+            current_date = specific_date
+
+        invoices = invoices.order_by('-invoice_date', '-invoice_number')
 
         from users.models import User
         customers = Customer.objects.all()
         staff_list = User.objects.all()
+
         return render(request, 'invoices/invoice_list.html', {
             'invoices': invoices,
             'customers': customers,
             'staff_list': staff_list,
+            'active_period': active_period,
+            'current_date': current_date,
         })
 
 

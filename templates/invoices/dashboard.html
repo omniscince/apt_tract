@@ -32,27 +32,45 @@
 
 {% else %}
 
-<!-- Mobile grid -->
-<div class="home-grid">
-    <a href="{% url 'customer_list' %}" class="home-tile">
-        <i class="bi bi-person-fill"></i><span>Customers</span>
-    </a>
-    <a href="{% url 'invoice_list' %}" class="home-tile">
-        <i class="bi bi-envelope-fill"></i><span>Invoices</span>
-    </a>
-    {% if user.role in 'owner,accountant' %}
-    <a href="{% url 'monthly_report' %}" class="home-tile">
-        <i class="bi bi-pie-chart-fill"></i><span>Reports</span>
-    </a>
-    {% endif %}
-    {% if user.role == 'owner' %}
-    <a href="{% url 'user_list' %}" class="home-tile">
-        <i class="bi bi-gear-fill"></i><span>Settings</span>
-    </a>
-    {% endif %}
-</div>
+<!-- ========== MOBILE ========== -->
+<div id="mobile-dash">
+    <div class="home-grid">
+        <a href="{% url 'customer_list' %}" class="home-tile">
+            <i class="bi bi-person-fill"></i><span>Customers</span>
+        </a>
+        <a href="{% url 'invoice_list' %}" class="home-tile">
+            <i class="bi bi-envelope-fill"></i><span>Invoices</span>
+        </a>
+        {% if user.role in 'owner,staff,accountant' %}
+        <a href="{% url 'car_list' %}" class="home-tile">
+            <i class="bi bi-car-front-fill"></i><span>Cars</span>
+        </a>
+        {% endif %}
+        <a href="{% url 'user_list' %}" class="home-tile">
+            <i class="bi bi-gear-fill"></i><span>Settings</span>
+        </a>
+    </div>
 
-<div style="padding:0 16px 16px;"><div class="ap-card ap-card-body" style="display:flex;align-items:center;justify-content:space-around;">
+    <!-- My Day mobile -->
+    <div style="padding:0 16px 12px;">
+        <div class="ap-card ap-card-body">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);">My Day</div>
+                <div style="display:flex;gap:6px;">
+                    <a href="?period=today" style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;text-decoration:none;{% if period == 'today' or not period %}background:var(--brand);color:#fff;{% else %}background:var(--bg);color:var(--muted);{% endif %}">Today</a>
+                    <a href="?period=week" style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;text-decoration:none;{% if period == 'week' %}background:var(--brand);color:#fff;{% else %}background:var(--bg);color:var(--muted);{% endif %}">Week</a>
+                    <a href="?period=month" style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;text-decoration:none;{% if period == 'month' %}background:var(--brand);color:#fff;{% else %}background:var(--bg);color:var(--muted);{% endif %}">Month</a>
+                    <a href="?period=all" style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;text-decoration:none;{% if period == 'all' %}background:var(--brand);color:#fff;{% else %}background:var(--bg);color:var(--muted);{% endif %}">All</a>
+                </div>
+            </div>
+            <div style="font-size:32px;font-weight:700;color:var(--success);">${{ my_amount|floatformat:0 }}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px;">{{ my_count }} invoice{{ my_count|pluralize }} · {{ user.get_full_name|default:user.email }}</div>
+        </div>
+    </div>
+
+    <!-- Stats mobile -->
+    <div style="padding:0 16px 16px;">
+        <div class="ap-card ap-card-body" style="display:flex;align-items:center;justify-content:space-around;">
             <div style="text-align:center;">
                 <div style="font-size:28px;font-weight:700;color:var(--brand);">{{ total_invoices }}</div>
                 <div style="font-size:12px;color:var(--muted);font-weight:600;">Total Invoices</div>
@@ -63,22 +81,134 @@
                 <div style="font-size:12px;color:var(--muted);font-weight:600;">Customers</div>
             </div>
         </div>
-
     </div>
+
+    <div style="padding:0 16px 28px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <span style="font-size:15px;font-weight:700;">Recent Invoices</span>
+            <a href="{% url 'invoice_list' %}" style="font-size:13px;color:var(--brand);text-decoration:none;">View all →</a>
+        </div>
+        <div class="ap-card">
+            {% for inv in recent_invoices %}
+            <a href="{% url 'invoice_detail' inv.pk %}" style="display:block;padding:14px 16px;border-bottom:1px solid var(--border);text-decoration:none;color:var(--text);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                    <strong style="font-size:14px;">{{ inv.invoice_number }}</strong>
+                    <span class="ap-badge badge-{{ inv.status }}">{{ inv.status|upper }}</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:flex-end;">
+                    <div>
+                        <div style="font-size:13px;color:var(--muted);">{{ inv.customer.name|default:'-'|truncatechars:28 }}</div>
+                        <div style="font-size:12px;color:var(--muted);">{{ inv.car.make }} {{ inv.car.model }} · {{ inv.invoice_date|date:"M d, Y" }}</div>
+                    </div>
+                    <strong style="font-size:16px;color:var(--brand);">${{ inv.total }}</strong>
+                </div>
+            </a>
+            {% empty %}
+            <div style="padding:24px;text-align:center;color:var(--muted);">No invoices yet</div>
+            {% endfor %}
+        </div>
+    </div>
+    {% if user.role in 'owner,staff' %}
+    <div class="speed-dial" id="speed-dial">
+        {% if user.role == 'owner' %}
+        <a href="{% url 'customer_create' %}" class="sd-btn" id="sd-customer" title="New Customer">
+            <i class="bi bi-person-fill"></i>
+        </a>
+        {% endif %}
+        <a href="{% url 'invoice_create' %}" class="sd-btn" id="sd-invoice" title="New Invoice">
+            <i class="bi bi-file-earmark-text-fill"></i>
+        </a>
+        <button class="fab" id="sd-main" onclick="toggleDial()" style="position:relative;bottom:auto;right:auto;">
+            <i class="bi bi-plus"></i>
+        </button>
+    </div>
+    {% endif %}
 </div>
 
-<!-- Desktop recent invoices -->
-<div style="padding:0 16px 28px;">
+<!-- ========== DESKTOP ========== -->
+<div id="desktop-dash" style="padding:24px 28px;">
+    <form method="get" id="dash-filter-form">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:20px;">
+            <div class="seg-control" style="flex-shrink:0;">
+                <button type="button" onclick="setPeriod('today')" class="{% if period == 'today' %}active{% endif %}">Today</button>
+                <button type="button" onclick="setPeriod('week')"  class="{% if period == 'week' %}active{% endif %}">Week</button>
+                <button type="button" onclick="setPeriod('month')" class="{% if period == 'month' or not period %}active{% endif %}">Month</button>
+                <button type="button" onclick="setPeriod('all')"   class="{% if period == 'all' %}active{% endif %}">All time</button>
+                <button type="button" onclick="setPeriod('custom')" class="{% if period == 'custom' %}active{% endif %}">Custom</button>
+            </div>
+            <input type="hidden" name="period" id="period-input" value="{{ period|default:'month' }}">
+            <div id="custom-dates" style="display:{% if period == 'custom' %}flex{% else %}none{% endif %};gap:8px;align-items:center;">
+                <input type="date" name="date_from" value="{{ date_from }}" class="form-control" style="width:150px;padding:7px 10px !important;font-size:13px !important;">
+                <span style="color:var(--muted);font-size:13px;">—</span>
+                <input type="date" name="date_to" value="{{ date_to }}" class="form-control" style="width:150px;padding:7px 10px !important;font-size:13px !important;">
+            </div>
+            {% if user.role == 'owner' %}
+            <select name="staff" class="form-control" style="width:160px;padding:7px 10px !important;font-size:13px !important;" onchange="this.form.submit()">
+                <option value="">All Staff</option>
+                {% for s in staff_list %}
+                <option value="{{ s.pk }}" {% if selected_staff == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.get_full_name|default:s.email }}</option>
+                {% endfor %}
+            </select>
+            {% endif %}
+            <select name="customer" class="form-control" style="width:180px;padding:7px 10px !important;font-size:13px !important;" onchange="this.form.submit()">
+                <option value="">All Customers</option>
+                {% for c in customers %}
+                <option value="{{ c.pk }}" {% if selected_customer == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="ap-btn ap-btn-primary ap-btn-sm">Filter</button>
+            <a href="{% url 'dashboard' %}" class="ap-btn ap-btn-outline ap-btn-sm">Reset</a>
+            <div style="margin-left:auto;">
+                <a href="{% url 'invoice_create' %}" class="ap-btn ap-btn-primary ap-btn-sm"><i class="bi bi-plus"></i> New Invoice</a>
+            </div>
+        </div>
+    </form>
+
+    <!-- My Day card desktop -->
+    <div class="ap-card" style="margin-bottom:24px;padding:20px 24px;display:flex;align-items:center;gap:32px;">
+        <div style="flex:1;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:6px;">My earnings · {% if period == 'today' or not period %}Today{% elif period == 'week' %}This week{% elif period == 'month' %}This month{% elif period == 'all' %}All time{% else %}Custom{% endif %}</div>
+            <div style="font-size:40px;font-weight:700;color:var(--success);">${{ my_amount|floatformat:0 }}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;border-left:1px solid var(--border);padding-left:32px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <i class="bi bi-file-earmark-text" style="font-size:16px;color:var(--muted);"></i>
+                <span style="font-size:14px;color:var(--muted);">{{ my_count }} invoice{{ my_count|pluralize }}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <i class="bi bi-person-fill" style="font-size:16px;color:var(--muted);"></i>
+                <span style="font-size:14px;color:var(--muted);">{{ user.get_full_name|default:user.email }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stat cards -->
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:24px;">
+        <div class="ap-card ap-card-body" style="text-align:center;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:6px;">Invoices</div>
+            <div style="font-size:36px;font-weight:700;color:var(--brand);">{{ total_invoices }}</div>
+        </div>
+        <div class="ap-card ap-card-body" style="text-align:center;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:6px;">Revenue</div>
+            <div style="font-size:36px;font-weight:700;color:var(--success);">${{ total_amount|floatformat:0 }}</div>
+        </div>
+        <div class="ap-card ap-card-body" style="text-align:center;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:6px;">Customers</div>
+            <div style="font-size:36px;font-weight:700;color:var(--text);">{{ total_customers }}</div>
+        </div>
+    </div>
+
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <span style="font-size:15px;font-weight:700;">Recent Invoices</span>
         <a href="{% url 'invoice_list' %}" style="font-size:13px;color:var(--brand);text-decoration:none;">View all →</a>
     </div>
-
-    <!-- table: wide -->
-    <div class="ap-card dash-table-wrap">
+    <div class="ap-card">
         <table class="ap-table">
             <thead>
-                <tr><th>Invoice #</th><th>Customer</th><th>Car</th><th>Date</th><th>Total</th><th>Status</th><th></th></tr>
+                <tr>
+                    <th>Invoice #</th><th>Customer</th><th>Car</th><th>Date</th>
+                    <th>Completed by</th><th>Total</th><th>Status</th><th></th>
+                </tr>
             </thead>
             <tbody>
                 {% for inv in recent_invoices %}
@@ -87,118 +217,47 @@
                     <td>{{ inv.customer.name|default:'-' }}</td>
                     <td>{{ inv.car.make }} {{ inv.car.model }}</td>
                     <td>{{ inv.invoice_date|date:"m/d/Y" }}</td>
+                    <td>{{ inv.work_completed_by.get_full_name|default:'-' }}</td>
                     <td><strong>${{ inv.total }}</strong></td>
                     <td><span class="ap-badge badge-{{ inv.status }}">{{ inv.status|upper }}</span></td>
                     <td><a href="{% url 'invoice_detail' inv.pk %}" class="ap-btn ap-btn-outline ap-btn-sm">View</a></td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px;">No invoices yet</td></tr>
+                <tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px;">No invoices yet</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-
-    <!-- cards: narrow -->
-    <div class="ap-card dash-cards-wrap" style="display:none;">
-        {% for inv in recent_invoices %}
-        <a href="{% url 'invoice_detail' inv.pk %}" style="display:block;padding:14px 16px;border-bottom:1px solid var(--border);text-decoration:none;color:var(--text);">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                <strong style="font-size:14px;">{{ inv.invoice_number }}</strong>
-                <span class="ap-badge badge-{{ inv.status }}">{{ inv.status|upper }}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;align-items:flex-end;">
-                <div>
-                    <div style="font-size:13px;color:var(--muted);">{{ inv.customer.name|default:'-'|truncatechars:28 }}</div>
-                    <div style="font-size:12px;color:var(--muted);">{{ inv.car.make }} {{ inv.car.model }} · {{ inv.invoice_date|date:"M d, Y" }}</div>
-                </div>
-                <strong style="font-size:16px;color:var(--brand);">${{ inv.total }}</strong>
-            </div>
-        </a>
-        {% empty %}
-        <div style="padding:24px;text-align:center;color:var(--muted);">No invoices yet</div>
-        {% endfor %}
-    </div>
 </div>
 
-{% if user.role in 'owner,staff' %}
-<div class="speed-dial" id="speed-dial">
-    <a href="{% url 'customer_create' %}" class="sd-btn" id="sd-customer" title="New Customer">
-        <i class="bi bi-person-fill"></i>
-    </a>
-    <a href="{% url 'invoice_create' %}" class="sd-btn" id="sd-invoice" title="New Invoice">
-        <i class="bi bi-file-earmark-text-fill"></i>
-    </a>
-    <button class="fab" id="sd-main" onclick="toggleDial()" style="position:relative;bottom:auto;right:auto;">
-        <i class="bi bi-plus" id="sd-icon"></i>
-    </button>
-</div>
-{% endif %}
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
 <style>
-.desktop-hide { display: none !important; }
-@media (max-width: 767px) {
-    .desktop-hide { display: flex !important; }
-}
+@media (max-width: 767px) { #desktop-dash { display: none; } #mobile-dash { display: block; } }
+@media (min-width: 768px) { #mobile-dash { display: none; } #desktop-dash { display: block; } }
 .speed-dial { position: fixed; bottom: calc(var(--bottom-h) + 14px); right: 16px; display: flex; flex-direction: column; align-items: center; gap: 12px; z-index: 190; }
-.sd-btn {
-    width: 44px; height: 44px; border-radius: 50%;
-    background: #fff; color: var(--brand);
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-    font-size: 20px; text-decoration: none;
-    transform: scale(0) translateY(20px);
-    opacity: 0;
-    transition: transform 0.2s ease, opacity 0.2s ease;
-    pointer-events: none;
-}
-.sd-btn.open {
-    transform: scale(1) translateY(0);
-    opacity: 1;
-    pointer-events: all;
-}
-#sd-invoice  { transition-delay: 0.05s; }
+.sd-btn { width: 44px; height: 44px; border-radius: 50%; background: #fff; color: var(--brand); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 20px; text-decoration: none; transform: scale(0) translateY(20px); opacity: 0; transition: transform 0.2s ease, opacity 0.2s ease; pointer-events: none; }
+.sd-btn.open { transform: scale(1) translateY(0); opacity: 1; pointer-events: all; }
+#sd-invoice { transition-delay: 0.05s; }
 #sd-customer { transition-delay: 0.1s; }
 #sd-main { transition: transform 0.3s ease; }
 #sd-main.open { transform: rotate(45deg); }
-@media (min-width: 768px) {
-    .speed-dial { display: none; }
-}
+@media (min-width: 768px) { .speed-dial { display: none; } }
 </style>
 <script>
-function checkDashTable() {
-    var body = document.getElementById('app-body');
-    if (!body) return;
-    var tw = document.querySelector('.dash-table-wrap');
-    var cw = document.querySelector('.dash-cards-wrap');
-    if (!tw || !cw) return;
-    if (body.clientWidth < 900) {
-        tw.style.display = 'none';
-        cw.style.display = 'block';
-    } else {
-        tw.style.display = 'block';
-        cw.style.display = 'none';
-    }
+function setPeriod(p) {
+    document.getElementById('period-input').value = p;
+    document.getElementById('custom-dates').style.display = p === 'custom' ? 'flex' : 'none';
+    if (p !== 'custom') document.getElementById('dash-filter-form').submit();
 }
-window.addEventListener('resize', checkDashTable);
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(checkDashTable, 50);
-    setTimeout(checkDashTable, 300);
-});
-
 function toggleDial() {
     var btns = document.querySelectorAll('.sd-btn');
     var main = document.getElementById('sd-main');
     var isOpen = main.classList.contains('open');
-    if (isOpen) {
-        btns.forEach(function(b){ b.classList.remove('open'); });
-        main.classList.remove('open');
-    } else {
-        btns.forEach(function(b){ b.classList.add('open'); });
-        main.classList.add('open');
-    }
+    if (isOpen) { btns.forEach(function(b){ b.classList.remove('open'); }); main.classList.remove('open'); }
+    else { btns.forEach(function(b){ b.classList.add('open'); }); main.classList.add('open'); }
 }
 </script>
 {% endblock %}

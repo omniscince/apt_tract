@@ -4,71 +4,82 @@
 {% block desktop_page_title %}Cars{% endblock %}
 
 {% block back_link %}
-<a href="{% url 'dashboard' %}" class="hdr-back"><i class="bi bi-chevron-left"></i> Back</a>
+<a href="#" onclick="history.back();return false;" class="hdr-back"><i class="bi bi-chevron-left"></i> Back</a>
 {% endblock %}
 
 {% block content %}
 
-<div class="card p-3 mb-4">
-    <form method="get" class="row g-2 align-items-end">
-        <div class="col-md-3">
-            <label class="form-label">Search by Customer</label>
-            <input type="text" name="q" class="form-control" placeholder="Customer name" value="{{ q }}">
+<!-- MOBILE -->
+<div id="mobile-view">
+    <div id="car-search-bar" style="display:none;background:#fff;padding:10px 16px;border-bottom:1px solid var(--border);">
+        <div style="background:var(--bg);border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
+            <i class="bi bi-search" style="color:var(--muted);font-size:16px;"></i>
+            <input type="text" id="car-search-input" placeholder="Search VIN, make, customer..."
+                   style="border:none;background:transparent;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;width:100%;"
+                   oninput="filterCars(this.value)">
+            <button onclick="closeCarSearch()" style="background:none;border:none;cursor:pointer;padding:0;">
+                <i class="bi bi-x" style="color:var(--muted);font-size:18px;"></i>
+            </button>
         </div>
-        <div class="col-md-3">
-            <label class="form-label">Search by VIN</label>
-            <input type="text" name="vin" class="form-control" placeholder="VIN number" value="{{ vin }}">
-        </div>
-        <div class="col-md-3">
-            <label class="form-label">Search by Stock #</label>
-            <input type="text" name="stock" class="form-control" placeholder="Stock number" value="{{ stock }}">
-        </div>
-        <div class="col-md-3 d-flex gap-2 align-items-end">
-            <button type="submit" class="btn btn-primary">Search</button>
-            <a href="{% url 'car_list' %}" class="btn btn-outline-secondary">Reset</a>
-        </div>
-    </form>
+    </div>
 
-<div style="padding:10px 16px;background:#fff;border-bottom:1px solid var(--border);">
-    <form method="get" style="display:flex;gap:8px;">
-        <input type="text" name="q" class="form-control" placeholder="Search VIN, make, model…" value="{{ request.GET.q }}" style="flex:1;">
-        <button type="submit" class="ap-btn ap-btn-primary ap-btn-sm"><i class="bi bi-search"></i></button>
-    </form>
+    <div class="ap-card" style="border-radius:0;border-left:none;border-right:none;border-top:none;">
+        {% for car in cars %}
+        <a href="{% url 'car_detail' car.pk %}" class="ap-list-item car-item"
+           data-make="{{ car.make|lower }}"
+           data-model="{{ car.model|lower }}"
+           data-vin="{{ car.vin|lower }}"
+           data-customer="{{ car.customer.name|lower }}">
+            <div class="ap-list-icon"><i class="bi bi-car-front-fill"></i></div>
+            <div class="ap-list-content">
+                <div class="ap-list-title">{{ car.make }} {{ car.model }}{% if car.year %} ({{ car.year }}){% endif %}</div>
+                <div class="ap-list-sub">
+                    {% if car.vin %}VIN: {{ car.vin }}{% endif %}
+                    {% if car.stock_number %} · Stock#: {{ car.stock_number }}{% endif %}
+                    {% if car.customer %} · {{ car.customer.name }}{% endif %}
+                </div>
+            </div>
+            <div class="ap-list-right" style="font-size:12px;color:var(--muted);">
+                {% if car.get_last_invoice_date %}{{ car.get_last_invoice_date|date:"M d" }}{% endif %}
+            </div>
+        </a>
+        {% empty %}
+        <div style="padding:48px 16px;text-align:center;color:var(--muted);">
+            <i class="bi bi-car-front" style="font-size:40px;display:block;margin-bottom:10px;"></i>
+            No cars found
+        </div>
+        {% endfor %}
+    </div>
 </div>
 
-<div class="ap-card" style="border-radius:0;border-left:none;border-right:none;border-top:none;">
-    {% for car in cars %}
-    <div class="ap-list-item">
-        <div class="ap-list-icon"><i class="bi bi-car-front-fill"></i></div>
-        <div class="ap-list-content">
-            <div class="ap-list-title">{{ car.make }} {{ car.model }}{% if car.year %} ({{ car.year }}){% endif %}</div>
-            <div class="ap-list-sub">
-                {% if car.vin %}VIN: {{ car.vin }}{% endif %}
-                {% if car.customer %} · {{ car.customer.name }}{% endif %}
+<!-- DESKTOP -->
+<div id="desktop-view">
+    <div class="ap-card" style="padding:16px;margin-bottom:16px;">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Customer</label>
+                <input type="text" name="q" class="form-control" placeholder="Customer name" value="{{ q }}">
             </div>
-        </div>
-        {% if user.role in 'owner,staff' %}
-        <a href="{% url 'car_edit' car.pk %}" class="ap-btn ap-btn-outline ap-btn-sm">Edit</a>
-        {% endif %}
+            <div class="col-md-3">
+                <label class="form-label">VIN</label>
+                <input type="text" name="vin" class="form-control" placeholder="VIN number" value="{{ vin }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Stock #</label>
+                <input type="text" name="stock" class="form-control" placeholder="Stock number" value="{{ stock }}">
+            </div>
+            <div class="col-md-3 d-flex gap-2 align-items-end">
+                <button type="submit" class="btn btn-primary">Search</button>
+                <a href="{% url 'car_list' %}" class="btn btn-outline-secondary">Reset</a>
+            </div>
+        </form>
     </div>
-    {% empty %}
-    <div style="padding:48px 16px;text-align:center;color:var(--muted);">
-        <i class="bi bi-car-front" style="font-size:40px;display:block;margin-bottom:10px;"></i>
-        No cars yet
-
-<div class="card">
-    <div class="table-responsive">
-        <table class="table table-hover mb-0">
-            <thead class="table-light">
+    <div class="ap-card">
+        <table class="ap-table">
+            <thead>
                 <tr>
-                    <th>Customer</th>
-                    <th>Make</th>
-                    <th>Model</th>
-                    <th>Year</th>
-                    <th>Stock#</th>
-                    <th>VIN</th>
-                    <th>Last Invoice</th>
-                    <th></th>
+                    <th>Customer</th><th>Make</th><th>Model</th><th>Year</th>
+                    <th>Stock#</th><th>VIN</th><th>Last Invoice</th><th></th>
                 </tr>
             </thead>
             <tbody>
@@ -80,31 +91,61 @@
                     <td>{{ car.year|default:'-' }}</td>
                     <td>{{ car.stock_number|default:'-' }}</td>
                     <td>{{ car.vin|default:'-' }}</td>
-                    <td>
-                        {% with last=car.get_last_invoice_date %}
-                        {% if last %}{{ last|date:"m/d/Y" }}{% else %}-{% endif %}
-                        {% endwith %}
-                    </td>
-                    <td class="d-flex gap-1">
-                        <a href="{% url 'car_detail' car.pk %}" class="btn btn-sm btn-outline-secondary">👁</a>
-                        <a href="{% url 'car_edit' car.pk %}" class="btn btn-sm btn-outline-primary">✏️</a>
-                        <form method="post" action="{% url 'car_delete' car.pk %}" class="d-inline"
-                              onsubmit="return confirm('Delete this car?')">
-                            {% csrf_token %}
-                            <button class="btn btn-sm btn-outline-danger">🗑</button>
+                    <td>{% with last=car.get_last_invoice_date %}{% if last %}{{ last|date:"m/d/Y" }}{% else %}-{% endif %}{% endwith %}</td>
+                    <td style="display:flex;gap:6px;">
+                        <a href="{% url 'car_detail' car.pk %}" class="ap-btn ap-btn-outline ap-btn-sm">View</a>
+                        <a href="{% url 'car_edit' car.pk %}" class="ap-btn ap-btn-outline ap-btn-sm"><i class="bi bi-pencil"></i></a>
+                        {% if user.role == 'owner' %}
+                        <form method="post" action="{% url 'car_delete' car.pk %}" class="d-inline" onsubmit="return confirm('Delete this car?')">
+                            {% csrf_token %}<button class="ap-btn ap-btn-danger ap-btn-sm"><i class="bi bi-trash"></i></button>
                         </form>
+                        {% endif %}
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="8" class="text-center text-muted py-4">No cars found</td></tr>
+                <tr><td colspan="8" style="text-align:center;color:var(--muted);padding:32px;">No cars found</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-    {% endfor %}
 </div>
 
 {% if user.role in 'owner,staff' %}
-<a href="{% url 'car_create' %}" class="fab"><i class="bi bi-plus"></i></a>
+<a href="{% url 'car_create' %}" class="fab desktop-hide"><i class="bi bi-plus"></i></a>
 {% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+.desktop-hide { display: none !important; }
+@media (max-width: 767px) { .desktop-hide { display: flex !important; } }
+@media (max-width: 767px) { #desktop-view { display: none; } #mobile-view { display: block; } }
+@media (min-width: 768px) { #mobile-view { display: none; } #desktop-view { display: block; padding: 24px 28px; } .fab { display: none !important; } }
+</style>
+<script>
+var carSearchOpen = false;
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.innerWidth >= 768) return;
+    var hdrRight = document.querySelector('.app-header .hdr-side:last-child');
+    if (!hdrRight) return;
+    hdrRight.innerHTML = '<button onclick="toggleCarSearch()" style="background:none;border:none;cursor:pointer;padding:4px;"><i class="bi bi-search" style="color:#fff;font-size:20px;"></i></button>';
+});
+function toggleCarSearch() {
+    var bar = document.getElementById('car-search-bar');
+    if (carSearchOpen) { bar.style.display='none'; document.getElementById('car-search-input').value=''; filterCars(''); carSearchOpen=false; }
+    else { bar.style.display='block'; document.getElementById('car-search-input').focus(); carSearchOpen=true; }
+}
+function closeCarSearch() { document.getElementById('car-search-bar').style.display='none'; document.getElementById('car-search-input').value=''; filterCars(''); carSearchOpen=false; }
+function filterCars(q) {
+    q = q.toLowerCase();
+    document.querySelectorAll('.car-item').forEach(function(item) {
+        var make = item.getAttribute('data-make')||'';
+        var model = item.getAttribute('data-model')||'';
+        var vin = item.getAttribute('data-vin')||'';
+        var cust = item.getAttribute('data-customer')||'';
+        item.style.display = (make.includes(q)||model.includes(q)||vin.includes(q)||cust.includes(q)) ? '' : 'none';
+    });
+}
+</script>
 {% endblock %}

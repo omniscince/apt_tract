@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}{{ title }} - AutoPro{% endblock %}
 {% block page_title %}{{ title }}{% endblock %}
+{% block back_link %}<a href="#" onclick="history.back();return false;" class="hdr-back"><i class="bi bi-chevron-left"></i> Back</a>{% endblock %}
 {% block content %}
 <div class="card p-4">
     <form method="post" id="invoice-form">
@@ -13,6 +14,24 @@
                 <div class="position-relative">
                     {{ form.customer_name }}
                     <div id="customer-suggestions" class="list-group position-absolute w-100" style="z-index:1000;display:none;"></div>
+                </div>
+                <!-- Quick create panel -->
+                <div id="quick-create-panel" style="display:none;background:#f8fff8;border:1px solid var(--success);border-radius:10px;padding:14px;margin-top:8px;">
+                    <div style="font-size:13px;font-weight:600;color:var(--success);margin-bottom:10px;"><i class="bi bi-person-plus"></i> New customer — fill details to create</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                        <div>
+                            <label class="form-label">Email *</label>
+                            <input type="email" id="quick-email" class="form-control" placeholder="email@example.com">
+                        </div>
+                        <div>
+                            <label class="form-label">Phone</label>
+                            <input type="tel" id="quick-phone" class="form-control" placeholder="+1 (647) 000-0000">
+                        </div>
+                    </div>
+                    <div id="quick-create-error" style="display:none;color:var(--danger);font-size:13px;margin-bottom:8px;"></div>
+                    <button type="button" onclick="quickCreateCustomer()" class="ap-btn ap-btn-success ap-btn-sm">
+                        <i class="bi bi-check2"></i> Create & Link Customer
+                    </button>
                 </div>
             </div>
 
@@ -49,7 +68,6 @@
                 {{ form.last_edit_date }}
             </div>
 
-            <!-- Invoice number override (owner only) -->
             {% if request.user.role == 'owner' %}
             <div class="col-md-6">
                 <label class="form-label">Invoice Number <small class="text-muted">(leave blank for auto)</small></label>
@@ -57,7 +75,6 @@
             </div>
             {% endif %}
 
-            <!-- Other fields -->
             <div class="col-md-6">
                 <label class="form-label">PO Number</label>
                 {{ form.po_number }}
@@ -73,30 +90,32 @@
         </div>
 
         <!-- Services -->
-        <h5 class="mb-3">Services</h5>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h5 style="margin:0;">Services</h5>
+            <button type="button" class="ap-btn ap-btn-primary ap-btn-sm" id="add-row">
+                <i class="bi bi-plus"></i> Add Service
+            </button>
+        </div>
         {{ formset.management_form }}
         <div id="formset-container">
             {% for item_form in formset %}
-            <div class="row g-2 mb-2 formset-row">
-                <div class="col-md-8">
+            <div class="formset-row" style="display:flex;align-items:center;gap:10px;margin-bottom:10px;background:#f8f9fa;border-radius:10px;padding:10px 12px;">
+                <div style="flex:1;">
                     {{ item_form.description }}
                     {{ item_form.id }}
                 </div>
-                <div class="col-md-3">
+                <div style="width:110px;">
                     {{ item_form.price }}
                 </div>
-                <div class="col-md-1 d-flex align-items-center">
-                    {% if item_form.DELETE %}
-                        {{ item_form.DELETE }}
-                    {% endif %}
-                </div>
+                {% if item_form.DELETE %}
+                <button type="button" onclick="deleteRow(this)" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--danger);font-size:18px;flex-shrink:0;">
+                    <i class="bi bi-trash"></i>
+                </button>
+                <div style="display:none;">{{ item_form.DELETE }}</div>
+                {% endif %}
             </div>
             {% endfor %}
         </div>
-
-        <button type="button" class="btn btn-outline-secondary btn-sm mb-4" id="add-row">
-            + Add Service
-        </button>
 
         {% if form.errors or formset.errors %}
         <div class="alert alert-danger">
@@ -117,32 +136,40 @@
 
 {% block scripts %}
 <script>
-// Customer autocomplete
-const customerInput = document.getElementById('id_customer_name');
-const suggestions = document.getElementById('customer-suggestions');
+document.addEventListener('DOMContentLoaded', function() {
+
+var customerInput = document.getElementById('id_customer_name');
+var suggestions = document.getElementById('customer-suggestions');
+var quickPanel = document.getElementById('quick-create-panel');
+var customerFound = false;
+
+if (!customerInput) return;
 
 customerInput.addEventListener('input', function() {
-    const q = this.value.trim();
-    if (q.length < 1) {
-        suggestions.style.display = 'none';
-        return;
-    }
-    fetch(`/api/customers/search/?q=${encodeURIComponent(q)}`)
-        .then(r => r.json())
-        .then(data => {
+    var q = this.value.trim();
+    quickPanel.style.display = 'none';
+    customerFound = false;
+    if (q.length < 1) { suggestions.style.display = 'none'; return; }
+    fetch('/api/customers/search/?q=' + encodeURIComponent(q))
+        .then(function(r){ return r.json(); })
+        .then(function(data) {
             suggestions.innerHTML = '';
             if (data.results.length === 0) {
                 suggestions.style.display = 'none';
+                if (q.length >= 2) quickPanel.style.display = 'block';
                 return;
             }
-            data.results.forEach(c => {
-                const item = document.createElement('button');
+            data.results.forEach(function(c) {
+                var item = document.createElement('button');
                 item.type = 'button';
                 item.className = 'list-group-item list-group-item-action';
-                item.innerHTML = `<strong>${c.name}</strong>${c.company ? ' — ' + c.company : ''} ${c.phone ? '<small class="text-muted">' + c.phone + '</small>' : ''}`;
+                item.innerHTML = '<strong>' + c.name + '</strong>' + (c.company ? ' — ' + c.company : '') + (c.phone ? ' <small class="text-muted">' + c.phone + '</small>' : '');
                 item.addEventListener('click', function() {
                     customerInput.value = c.name;
                     suggestions.style.display = 'none';
+                    quickPanel.style.display = 'none';
+                    customerFound = true;
+                    unlockField(fields.vin);
                 });
                 suggestions.appendChild(item);
             });
@@ -151,39 +178,40 @@ customerInput.addEventListener('input', function() {
 });
 
 document.addEventListener('click', function(e) {
-    if (!customerInput.contains(e.target) && !suggestions.contains(e.target)) {
+    if (customerInput && !customerInput.contains(e.target) && suggestions && !suggestions.contains(e.target)) {
         suggestions.style.display = 'none';
     }
 });
 
-// Field order enforcement: customer → VIN → make → model → rest
-const fields = {
+// Field order enforcement
+var fields = {
     vin: document.getElementById('id_car_vin'),
     make: document.getElementById('id_car_make'),
     model: document.getElementById('id_car_model'),
 };
 
 function lockField(field) {
+    if (!field) return;
     field.disabled = true;
     field.style.backgroundColor = '#f0f0f0';
     field.style.cursor = 'not-allowed';
+    field.style.opacity = '0.5';
 }
-
 function unlockField(field) {
+    if (!field) return;
     field.disabled = false;
     field.style.backgroundColor = '';
     field.style.cursor = '';
+    field.style.opacity = '1';
 }
 
-// Initially lock make, model only for new invoices
-const isEditMode = window.location.href.includes('/edit/');
+var isEditMode = window.location.href.includes('/edit/');
 if (!isEditMode) {
     lockField(fields.vin);
     lockField(fields.make);
     lockField(fields.model);
 }
 
-// Unlock VIN when customer is selected
 customerInput.addEventListener('input', function() {
     if (this.value.trim().length > 0) {
         unlockField(fields.vin);
@@ -194,120 +222,160 @@ customerInput.addEventListener('input', function() {
     }
 });
 
-// Unlock make when VIN has 8+ chars
-fields.vin.addEventListener('input', function() {
-    if (this.value.trim().length >= 8) {
-        unlockField(fields.make);
-    } else {
-        lockField(fields.make);
-        lockField(fields.model);
-        fields.make.value = '';
-        fields.model.value = '';
-    }
-});
+if (fields.vin) {
+    fields.vin.addEventListener('input', function() {
+        if (this.value.trim().length >= 8) {
+            unlockField(fields.make);
+        } else {
+            lockField(fields.make);
+            lockField(fields.model);
+            if (fields.make) fields.make.value = '';
+            if (fields.model) fields.model.value = '';
+        }
+    });
+}
 
-// Unlock model when make is filled
-fields.make.addEventListener('input', function() {
-    if (this.value.trim().length > 0) {
-        unlockField(fields.model);
-    } else {
-        lockField(fields.model);
-        fields.model.value = '';
-    }
-});
+if (fields.make) {
+    fields.make.addEventListener('input', function() {
+        if (this.value.trim().length > 0) {
+            unlockField(fields.model);
+        } else {
+            lockField(fields.model);
+            if (fields.model) fields.model.value = '';
+        }
+    });
+}
 
-// Auto due date +1 month from invoice date
-const invoiceDateInput = document.getElementById('id_invoice_date');
-const dueDateInput = document.getElementById('id_due_date');
-
-invoiceDateInput.addEventListener('change', function() {
-    const invoiceDate = new Date(this.value);
-    if (!isNaN(invoiceDate)) {
-        invoiceDate.setMonth(invoiceDate.getMonth() + 1);
-        const y = invoiceDate.getFullYear();
-        const m = String(invoiceDate.getMonth() + 1).padStart(2, '0');
-        const d = String(invoiceDate.getDate()).padStart(2, '0');
-        dueDateInput.value = `${y}-${m}-${d}`;
-    }
-});
+// Auto due date
+var invoiceDateInput = document.getElementById('id_invoice_date');
+var dueDateInput = document.getElementById('id_due_date');
+if (invoiceDateInput) {
+    invoiceDateInput.addEventListener('change', function() {
+        var invoiceDate = new Date(this.value);
+        if (!isNaN(invoiceDate)) {
+            invoiceDate.setMonth(invoiceDate.getMonth() + 1);
+            var y = invoiceDate.getFullYear();
+            var m = String(invoiceDate.getMonth() + 1).padStart(2, '0');
+            var d = String(invoiceDate.getDate()).padStart(2, '0');
+            if (dueDateInput) dueDateInput.value = y + '-' + m + '-' + d;
+        }
+    });
+}
 
 // VIN validation
-const vinInput = document.getElementById('id_car_vin');
-const vinError = document.getElementById('vin-error');
+var vinInput = document.getElementById('id_car_vin');
+var vinError = document.getElementById('vin-error');
 
 function validateVin() {
-    const vin = vinInput.value.trim();
+    if (!vinInput) return true;
+    var vin = vinInput.value.trim();
     if (vin.length > 0 && vin.length < 8) {
-        vinError.style.display = 'block';
+        if (vinError) vinError.style.display = 'block';
         return false;
     } else {
-        vinError.style.display = 'none';
+        if (vinError) vinError.style.display = 'none';
         return true;
     }
 }
+if (vinInput) vinInput.addEventListener('input', validateVin);
 
-vinInput.addEventListener('input', validateVin);
-
-// Form submit validation
-document.getElementById('invoice-form').addEventListener('submit', function(e) {
-    let valid = true;
-
-    // VIN validation
-    if (!validateVin()) {
-        valid = false;
-        vinInput.focus();
-    }
-
-    // Customer validation
-    if (!customerInput.value.trim()) {
-        valid = false;
-        customerInput.style.border = '2px solid red';
-        customerInput.focus();
-    } else {
-        customerInput.style.border = '';
-    }
-
-    // Services validation - at least one service with description and price
-    const descriptions = document.querySelectorAll('[name$="-description"]');
-    const prices = document.querySelectorAll('[name$="-price"]');
-    let hasService = false;
-    descriptions.forEach((desc, i) => {
-        const deleteCheckbox = document.querySelector(`[name="items-${i}-DELETE"]`);
-        const isDeleted = deleteCheckbox && deleteCheckbox.checked;
-        if (!isDeleted && desc.value.trim() && prices[i] && parseFloat(prices[i].value) > 0) {
-            hasService = true;
+// Form submit
+var invoiceForm = document.getElementById('invoice-form');
+if (invoiceForm) {
+    invoiceForm.addEventListener('submit', function(e) {
+        var valid = true;
+        if (!validateVin()) { valid = false; if (vinInput) vinInput.focus(); }
+        // Customer validation
+        if (!customerInput.value.trim()) {
+            valid = false;
+            customerInput.style.border = '2px solid red';
+            customerInput.focus();
+        } else if (!customerFound && !window._customerFound) {
+          // check if customer exists in DB
+          valid = false;
+          customerInput.style.border = '2px solid orange';
+          var qcp = document.getElementById('quick-create-panel');
+          if (qcp) qcp.style.display = 'block';
+          alert('Customer not found. Please select an existing customer or create a new one using the green panel.');
+        } else {
+            customerInput.style.border = '';
         }
+        var descriptions = document.querySelectorAll('[name$="-description"]');
+        var prices = document.querySelectorAll('[name$="-price"]');
+        var hasService = false;
+        descriptions.forEach(function(desc, i) {
+            var deleteCheckbox = document.querySelector('[name="items-' + i + '-DELETE"]');
+            var isDeleted = deleteCheckbox && deleteCheckbox.checked;
+            if (!isDeleted && desc.value.trim() && prices[i] && parseFloat(prices[i].value) > 0) {
+                hasService = true;
+            }
+        });
+        if (!hasService) { valid = false; alert('Please add at least one service with description and price.'); }
+        if (!valid) e.preventDefault();
     });
-    if (!hasService) {
-        valid = false;
-        alert('Please add at least one service with description and price.');
-    }
-
-    if (!valid) e.preventDefault();
-});
+}
 
 // Add service row
-document.getElementById('add-row').addEventListener('click', function() {
-    const container = document.getElementById('formset-container');
-    const totalForms = document.getElementById('id_items-TOTAL_FORMS');
-    const formNum = parseInt(totalForms.value);
-    const newRow = document.createElement('div');
-    newRow.className = 'row g-2 mb-2 formset-row';
-    newRow.innerHTML = `
-        <div class="col-md-8">
-            <input type="text" name="items-${formNum}-description" class="form-control" placeholder="Service description" autocomplete="off">
-            <input type="hidden" name="items-${formNum}-id" value="">
-        </div>
-        <div class="col-md-3">
-            <input type="number" name="items-${formNum}-price" class="form-control" placeholder="0.00" step="0.01">
-        </div>
-        <div class="col-md-1">
-            <input type="checkbox" name="items-${formNum}-DELETE" style="margin-top: 10px;">
-        </div>
-    `;
-    container.appendChild(newRow);
-    totalForms.value = formNum + 1;
-});
+var addRowBtn = document.getElementById('add-row');
+if (addRowBtn) {
+    addRowBtn.addEventListener('click', function() {
+        var container = document.getElementById('formset-container');
+        var totalForms = document.getElementById('id_items-TOTAL_FORMS');
+        var formNum = parseInt(totalForms.value);
+        var newRow = document.createElement('div');
+        newRow.className = 'formset-row';
+        newRow.style = 'display:flex;align-items:center;gap:10px;margin-bottom:10px;background:#f8f9fa;border-radius:10px;padding:10px 12px;';
+        newRow.innerHTML =
+            '<div style="flex:1;"><input type="text" name="items-' + formNum + '-description" class="form-control" placeholder="SERVICE DESCRIPTION" autocomplete="off"><input type="hidden" name="items-' + formNum + '-id" value=""></div>' +
+            '<div style="width:110px;"><input type="number" name="items-' + formNum + '-price" class="form-control" placeholder="0.00" step="0.01"></div>' +
+            '<button type="button" onclick="deleteRow(this)" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--danger);font-size:18px;flex-shrink:0;"><i class="bi bi-trash"></i></button>' +
+            '<div style="display:none;"><input type="checkbox" name="items-' + formNum + '-DELETE"></div>';
+        container.appendChild(newRow);
+        totalForms.value = formNum + 1;
+    });
+}
+
+}); // end DOMContentLoaded
+
+function deleteRow(btn) {
+    var row = btn.closest('.formset-row');
+    var checkbox = row.querySelector('input[type=checkbox]');
+    if (checkbox) { checkbox.checked = true; row.style.display = 'none'; }
+    else row.remove();
+}
+
+function quickCreateCustomer() {
+    var customerInput = document.getElementById('id_customer_name');
+    var name = customerInput ? customerInput.value.trim() : '';
+    var emailEl = document.getElementById('quick-email');
+    var phone = document.getElementById('quick-phone').value.trim();
+    var errEl = document.getElementById('quick-create-error');
+    var quickPanel = document.getElementById('quick-create-panel');
+    var email = emailEl ? emailEl.value.trim() : '';
+
+    if (!email) { errEl.textContent = 'Email is required'; errEl.style.display = 'block'; return; }
+    // validate email format
+    var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) { errEl.textContent = 'Please enter a valid email address'; errEl.style.display = 'block'; return; }
+    errEl.style.display = 'none';
+
+    fetch('/api/customers/quick-create/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value},
+        body: JSON.stringify({name: name, email: email, phone: phone})
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+        if (data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
+        // схлопнуть в зелёную полоску
+        quickPanel.innerHTML = '<div style="display:flex;align-items:center;gap:8px;color:var(--success);font-size:13px;font-weight:600;"><i class="bi bi-check-circle-fill"></i> Customer "' + data.name + '" created successfully</div>';
+        quickPanel.style.padding = '10px 14px';
+        if (customerInput) customerInput.style.borderColor = 'var(--success)';
+        // set customerFound = true
+        window._customerFound = true;
+    })
+    .catch(function(){ errEl.textContent = 'Something went wrong'; errEl.style.display = 'block'; });
+}
 </script>
 <script>
 function applyUppercase(el) {

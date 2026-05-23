@@ -1,35 +1,47 @@
 {% extends 'base.html' %}
 {% block title %}Invoices - AutoPro{% endblock %}
-{% block page_title %}
-    {% with status=request.GET.status %}
-        {% if status == 'final' %}Final Invoices
-        {% elif status == 'cancelled' %}Cancelled Invoices
-        {% else %}Draft Invoices{% endif %}
-    {% endwith %}
-{% endblock %}
+{% block page_title %}Invoices{% endblock %}
 {% block desktop_page_title %}Invoices{% endblock %}
 
 {% block back_link %}
-<a href="{% url 'dashboard' %}" class="hdr-back"><i class="bi bi-chevron-left"></i> Back</a>
+<a href="#" onclick="history.back();return false;" class="hdr-back"><i class="bi bi-chevron-left"></i> Back</a>
 {% endblock %}
 
 {% block content %}
 
-<!-- ═══════════════════════  MOBILE  ═══════════════════════ -->
+<!-- MOBILE -->
 <div id="mobile-view">
 
-    <div class="date-nav">
-        <button class="date-nav-btn" id="prev-date"><i class="bi bi-chevron-left"></i></button>
-        <button id="date-label-btn"
-                style="background:none;border:none;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--text);">
-            {{ current_date_display }}
+    <div id="search-bar" style="display:none;background:#fff;padding:10px 16px;border-bottom:1px solid var(--border);">
+        <div style="background:var(--bg);border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
+            <i class="bi bi-search" style="color:var(--muted);font-size:16px;"></i>
+            <input type="text" id="search-input" placeholder="Search invoice # or customer..."
+                   style="border:none;background:transparent;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;width:100%;"
+                   oninput="filterInvoices(this.value)">
+            <button onclick="closeSearch()" style="background:none;border:none;cursor:pointer;padding:0;">
+                <i class="bi bi-x" style="color:var(--muted);font-size:18px;"></i>
+            </button>
+        </div>
+    </div>
+
+    <div style="background:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);">
+        <div style="display:flex;gap:8px;">
+            <button onclick="switchSent('')" class="sent-chip {% if request.GET.sent == '' or not request.GET.sent %}sent-chip-active{% endif %}">All</button>
+            <button onclick="switchSent('1')" class="sent-chip {% if request.GET.sent == '1' %}sent-chip-active{% endif %}">Sent</button>
+            <button onclick="switchSent('0')" class="sent-chip {% if request.GET.sent == '0' %}sent-chip-active{% endif %}">Not Sent</button>
+        </div>
+        <button onclick="openSheet('date')" style="display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:20px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;{% if active_period or current_date %}background:#e6f4ea;color:#2e7d32;{% else %}background:var(--bg);color:var(--muted);{% endif %}">
+            <i class="bi bi-calendar3" style="font-size:13px;"></i>
+            <span>{% if active_period == 'today' %}Today{% elif active_period == 'week' %}This Week{% elif active_period == 'month' %}This Month{% elif current_date %}{{ current_date }}{% else %}Date{% endif %}</span>
+            {% if active_period or current_date %}<span onclick="clearDate(event)" style="font-size:16px;line-height:1;">×</span>{% endif %}
         </button>
-        <button class="date-nav-btn" id="next-date"><i class="bi bi-chevron-right"></i></button>
     </div>
 
     <div class="ap-card" style="border-radius:0;border-left:none;border-right:none;border-top:none;">
         {% for inv in invoices %}
-        <a href="{% url 'invoice_detail' inv.pk %}" class="ap-list-item">
+        <a href="{% url 'invoice_detail' inv.pk %}" class="ap-list-item invoice-item"
+           data-number="{{ inv.invoice_number|lower }}"
+           data-customer="{{ inv.get_customer_display|lower }}">
             <div class="ap-list-icon">
                 <i class="bi bi-{% if inv.email_sent %}envelope-check-fill{% else %}envelope{% endif %}"
                    style="color:{% if inv.email_sent %}var(--success){% else %}var(--muted){% endif %};"></i>
@@ -46,23 +58,13 @@
         {% empty %}
         <div style="padding:48px 16px;text-align:center;color:var(--muted);">
             <i class="bi bi-inbox" style="font-size:40px;display:block;margin-bottom:10px;"></i>
-            No {% with status=request.GET.status %}{% if status == 'final' %}finalized{% elif status == 'cancelled' %}cancelled{% else %}draft{% endif %}{% endwith %} invoices for the selected date
+            No invoices found
         </div>
         {% endfor %}
     </div>
-
-    <!-- Tab bar: z-index 199, sits above bottom-nav (200 is fine, tabs are inside page flow) -->
-    <div id="invoice-tabs">
-        <button class="invoice-tab-btn {% if request.GET.sent == '' or not request.GET.sent %}tab-active{% endif %}"
-                onclick="switchSent('')">All</button>
-        <button class="invoice-tab-btn {% if request.GET.sent == '1' %}tab-active{% endif %}"
-                onclick="switchSent('1')">Sent</button>
-        <button class="invoice-tab-btn {% if request.GET.sent == '0' %}tab-active{% endif %}"
-                onclick="switchSent('0')">Not Sent</button>
-    </div>
 </div>
 
-<!-- ═══════════════════════  DESKTOP  ═══════════════════════ -->
+<!-- DESKTOP -->
 <div id="desktop-view">
     <div class="ap-card" style="padding:16px;margin-bottom:16px;">
         <form method="get" class="row g-2 align-items-end">
@@ -98,25 +100,25 @@
                 <label class="form-label">Status</label>
                 <select name="status" class="form-control">
                     <option value="">All</option>
-                    <option value="draft"     {% if request.GET.status == 'draft'     %}selected{% endif %}>Draft</option>
-                    <option value="final"     {% if request.GET.status == 'final'     %}selected{% endif %}>Final</option>
+                    <option value="draft" {% if request.GET.status == 'draft' %}selected{% endif %}>Draft</option>
+                    <option value="final" {% if request.GET.status == 'final' %}selected{% endif %}>Final</option>
                     <option value="cancelled" {% if request.GET.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
                 </select>
             </div>
             <div class="col-md-2 d-flex gap-2">
-                <button type="submit" class="btn btn-primary">Filter</button>
-                <a href="{% url 'invoice_list' %}" class="btn btn-outline-secondary">Reset</a>
+                <button type="submit" class="ap-btn ap-btn-primary ap-btn-sm">Filter</button>
+                <a href="{% url 'invoice_list' %}" class="ap-btn ap-btn-outline ap-btn-sm">Reset</a>
+                <a href="{% url 'invoice_create' %}" class="ap-btn ap-btn-primary ap-btn-sm" style="margin-left:auto;"><i class="bi bi-plus"></i> New</a>
             </div>
         </form>
     </div>
-
     <div class="ap-card">
         <table class="ap-table">
             <thead>
                 <tr>
                     <th>Invoice #</th><th>Customer</th><th>Car</th>
                     <th>Date</th><th>Subtotal</th><th>Total</th>
-                    <th>Created By</th><th>Status</th><th></th>
+                    <th>Work Completed By</th><th>Sent</th><th>Status</th><th></th>
                 </tr>
             </thead>
             <tbody>
@@ -128,12 +130,24 @@
                     <td>{{ inv.invoice_date|date:"m/d/Y" }}</td>
                     <td>${{ inv.subtotal }}</td>
                     <td><strong>${{ inv.total }}</strong></td>
-                    <td>{{ inv.created_by.get_full_name|default:'-' }}</td>
+                    <td>{{ inv.work_completed_by.get_full_name|default:'-' }}</td>
+                    <td>{% if inv.email_sent %}<span style="color:var(--success);">✓</span>{% else %}<span style="color:var(--muted);">–</span>{% endif %}</td>
                     <td><span class="ap-badge badge-{{ inv.status }}">{{ inv.status|upper }}</span></td>
-                    <td><a href="{% url 'invoice_detail' inv.pk %}" class="ap-btn ap-btn-outline ap-btn-sm">View</a></td>
+                    <td style="display:flex;gap:6px;">
+                        <a href="{% url 'invoice_detail' inv.pk %}" class="ap-btn ap-btn-outline ap-btn-sm">View</a>
+                        {% if user.role in 'owner,staff' %}
+                        <a href="{% url 'invoice_edit' inv.pk %}" class="ap-btn ap-btn-outline ap-btn-sm"><i class="bi bi-pencil"></i></a>
+                        {% endif %}
+                        {% if user.role == 'owner' %}
+                        <form method="post" action="{% url 'invoice_delete' inv.pk %}" class="d-inline" onsubmit="return confirm('Delete invoice {{ inv.invoice_number }}?')">
+                            {% csrf_token %}
+                            <button class="ap-btn ap-btn-danger ap-btn-sm"><i class="bi bi-trash"></i></button>
+                        </form>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="9" style="text-align:center;color:var(--muted);padding:32px;">No invoices found</td></tr>
+                <tr><td colspan="10" style="text-align:center;color:var(--muted);padding:32px;">No invoices found</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -141,83 +155,229 @@
 </div>
 
 {% if user.role in 'owner,staff' %}
-<!-- fab-above-tabs pushes the button above the Draft/Final/Cancelled bar on mobile -->
-<a href="{% url 'invoice_create' %}" class="fab fab-above-tabs"><i class="bi bi-plus"></i></a>
+<a href="{% url 'invoice_create' %}" class="fab desktop-hide"><i class="bi bi-plus"></i></a>
 {% endif %}
+
+<!-- DATE SHEET -->
+<div class="ap-overlay" id="date-overlay" onclick="closeSheet('date')"></div>
+<div class="ap-sheet" id="date-sheet">
+    <span class="ap-sheet-handle"></span>
+    <div class="ap-sheet-title">Filter by date</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+        <button onclick="applyPeriod('today')" class="period-btn {% if active_period == 'today' %}period-btn-active{% endif %}">Today</button>
+        <button onclick="applyPeriod('week')" class="period-btn {% if active_period == 'week' %}period-btn-active{% endif %}">This Week</button>
+        <button onclick="applyPeriod('month')" class="period-btn {% if active_period == 'month' %}period-btn-active{% endif %}">This Month</button>
+        <button onclick="applyPeriod('')" class="period-btn {% if not active_period and not date_from and not current_date %}period-btn-active{% endif %}">All Time</button>
+    </div>
+    <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Date range</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+        <div>
+            <label class="ap-label">From</label>
+            <input type="date" id="date-from" class="form-control" value="{{ date_from }}">
+        </div>
+        <div>
+            <label class="ap-label">To</label>
+            <input type="date" id="date-to" class="form-control" value="{{ date_to }}">
+        </div>
+    </div>
+    <div style="display:flex;gap:10px;">
+        <button onclick="applyRange()" class="ap-btn ap-btn-primary" style="flex:1;"><i class="bi bi-check2"></i> Apply</button>
+        <button onclick="closeSheet('date')" class="ap-btn ap-btn-outline" style="flex:1;">Close</button>
+    </div>
+</div>
+
+<!-- FILTER SHEET -->
+<div class="ap-overlay" id="filter-overlay" onclick="closeSheet('filter')"></div>
+<div class="ap-sheet" id="filter-sheet">
+    <span class="ap-sheet-handle"></span>
+    <div class="ap-sheet-title">Filter Invoices</div>
+    <form method="get" action="{% url 'invoice_list' %}">
+        {% if active_period %}<input type="hidden" name="period" value="{{ active_period }}">{% endif %}
+        {% if current_date %}<input type="hidden" name="date" value="{{ current_date }}">{% endif %}
+        {% if request.GET.sent %}<input type="hidden" name="sent" value="{{ request.GET.sent }}">{% endif %}
+
+        <div class="form-group">
+            <label class="ap-label">Customer</label>
+            <div style="position:relative;">
+                <input type="text" id="filter-customer-input" class="form-control" placeholder="Search customer..."
+                       value="{% for c in customers %}{% if request.GET.customer == c.pk|stringformat:"s" %}{{ c.name }}{% endif %}{% endfor %}"
+                       autocomplete="off">
+                <input type="hidden" name="customer" id="filter-customer-id" value="{{ request.GET.customer }}">
+                <div id="filter-customer-suggestions" style="display:none;position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid var(--border);border-radius:10px;max-height:200px;overflow-y:auto;z-index:600;box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+                    <div onclick="selectFilterCustomer('', '')" style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--border);color:var(--muted);">All Customers</div>
+                    {% for c in customers %}
+                    <div onclick="selectFilterCustomer('{{ c.pk }}', '{{ c.name|escapejs }}')" style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--border);">{{ c.name }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        {% if user.role == 'owner' %}
+        <div class="form-group">
+            <label class="ap-label">Staff</label>
+            <div style="position:relative;">
+                <input type="text" id="filter-staff-input" class="form-control" placeholder="Search staff..."
+                       value="{% for s in staff_list %}{% if request.GET.staff == s.pk|stringformat:"s" %}{{ s.get_full_name }}{% endif %}{% endfor %}"
+                       autocomplete="off">
+                <input type="hidden" name="staff" id="filter-staff-id" value="{{ request.GET.staff }}">
+                <div id="filter-staff-suggestions" style="display:none;position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid var(--border);border-radius:10px;max-height:200px;overflow-y:auto;z-index:600;box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+                    <div onclick="selectFilterStaff('', '')" style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--border);color:var(--muted);">All Staff</div>
+                    {% for s in staff_list %}
+                    <div onclick="selectFilterStaff('{{ s.pk }}', '{{ s.get_full_name|escapejs }}')" style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--border);">{{ s.get_full_name }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="form-group">
+            <label class="ap-label">VIN</label>
+            <input type="text" name="vin" class="form-control" placeholder="Search by VIN..." value="{{ request.GET.vin }}">
+        </div>
+
+        <div class="form-group">
+            <label class="ap-label">Status</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" onclick="selectStatus('')" class="status-btn {% if not request.GET.status %}status-btn-active{% endif %}" data-val="">All</button>
+                <button type="button" onclick="selectStatus('draft')" class="status-btn {% if request.GET.status == 'draft' %}status-btn-active{% endif %}" data-val="draft">Draft</button>
+                <button type="button" onclick="selectStatus('final')" class="status-btn {% if request.GET.status == 'final' %}status-btn-active{% endif %}" data-val="final">Final</button>
+                <button type="button" onclick="selectStatus('cancelled')" class="status-btn {% if request.GET.status == 'cancelled' %}status-btn-active{% endif %}" data-val="cancelled">Cancelled</button>
+                <input type="hidden" name="status" id="filter-status-val" value="{{ request.GET.status }}">
+            </div>
+        </div>
+
+
+        <div class="ap-sheet-actions">
+            <button type="submit" class="ap-btn ap-btn-primary" style="flex:1;"><i class="bi bi-check2"></i> Apply</button>
+            <a href="{% url 'invoice_list' %}" class="ap-btn ap-btn-outline" style="flex:1;text-align:center;">Reset</a>
+        </div>
+    </form>
+</div>
 
 {% endblock %}
 
 {% block scripts %}
 <style>
-.invoice-tab-btn {
-    flex: 1; border: none; background: transparent; padding: 12px 8px;
-    font-size: 13px; font-weight: 600; font-family: 'DM Sans', sans-serif;
-    color: var(--muted); cursor: pointer;
-    border-top: 2px solid transparent;
-    transition: color 0.15s, border-color 0.15s;
-}
-.invoice-tab-btn.tab-active { color: var(--brand); border-top-color: var(--brand); }
-
-/* Tab bar fixed just above bottom-nav */
-#invoice-tabs {
-    position: fixed;
-    bottom: var(--bottom-h);
-    left: 0; right: 0;
-    height: 48px;
-    background: #fff;
-    border-top: 1px solid var(--border);
-    display: flex;
-    z-index: 199;
-}
-
+.status-btn { border:1.5px solid var(--border);background:var(--bg);color:var(--text);border-radius:20px;padding:5px 14px;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s; }
+.status-btn-active { background:var(--brand);color:#fff;border-color:var(--brand); }
+.desktop-hide { display: none !important; }
+@media (max-width: 767px) { .desktop-hide { display: flex !important; } }
+.sent-chip { border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;background:var(--bg);color:var(--muted);transition:all 0.15s; }
+.sent-chip-active { background:var(--brand);color:#fff; }
+.period-btn { border:1.5px solid var(--border);background:var(--bg);color:var(--text);border-radius:10px;padding:10px;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s; }
+.period-btn-active { background:var(--brand);color:#fff;border-color:var(--brand); }
 @media (max-width: 767px) {
-    #desktop-view { display: none; }
-    #mobile-view  { display: block; }
-    /* Extra bottom padding so last list item isn't hidden under tab bar */
-    .app-body { padding-bottom: calc(var(--bottom-h) + 48px + 8px) !important; }
+    #desktop-view { display:none; }
+    #mobile-view  { display:block; }
+    .app-body { padding-bottom:calc(var(--bottom-h) + 8px) !important; }
 }
 @media (min-width: 768px) {
-    #mobile-view   { display: none; }
-    #desktop-view  { display: block; }
-    #invoice-tabs  { display: none !important; }
-    /* Reset extra padding on desktop */
-    .app-body { padding-bottom: 0 !important; }
-    /* FAB not needed on desktop (filter + New Invoice button in form) */
-    .fab { display: none !important; }
+    #mobile-view  { display:none; }
+    #desktop-view { display:block;padding:24px 28px; }
+    .fab { display:none !important; }
 }
 </style>
 <script>
-var currentDate = '{{ request.GET.date|default:"" }}';
+var searchOpen = false;
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.innerWidth >= 768) return;
+    var hdrRight = document.querySelector('.app-header .hdr-side:last-child');
+    if (!hdrRight) return;
+    hdrRight.innerHTML =
+        '<button id="search-toggle-btn" onclick="toggleSearch()" style="background:none;border:none;cursor:pointer;padding:4px;">' +
+            '<i class="bi bi-search" style="color:#fff;font-size:20px;"></i>' +
+        '</button>' +
+        '<button onclick="openSheet(\'filter\')" style="background:none;border:none;cursor:pointer;padding:4px;margin-left:6px;">' +
+            '<i class="bi bi-sliders" style="color:#fff;font-size:20px;"></i>' +
+        '</button>';
+});
+function toggleSearch() {
+    var bar = document.getElementById('search-bar');
+    if (searchOpen) { bar.style.display='none'; document.getElementById('search-input').value=''; filterInvoices(''); searchOpen=false; }
+    else { bar.style.display='block'; document.getElementById('search-input').focus(); searchOpen=true; }
+}
+function closeSearch() { document.getElementById('search-bar').style.display='none'; document.getElementById('search-input').value=''; filterInvoices(''); searchOpen=false; }
+function filterInvoices(q) {
+    q = q.toLowerCase();
+    document.querySelectorAll('.invoice-item').forEach(function(item) {
+        var num = item.getAttribute('data-number')||'';
+        var cust = item.getAttribute('data-customer')||'';
+        item.style.display = (num.includes(q)||cust.includes(q)) ? '' : 'none';
+    });
+}
+var currentSent = '{{ request.GET.sent|default:"" }}';
+var currentDate = '{{ current_date|default:"" }}';
+var currentPeriod = '{{ active_period|default:"" }}';
+function switchSent(sent) { window.location.href = buildUrl({sent:sent}); }
+function applyPeriod(period) { closeSheet('date'); window.location.href = buildUrl({period:period,date:''}); }
+function applyDate(date) { if(!date)return; closeSheet('date'); window.location.href = buildUrl({date:date,period:'',date_from:'',date_to:''}); }
+function clearDate(e) { e.stopPropagation(); window.location.href = buildUrl({date:'',period:'',date_from:'',date_to:''}); }
+function buildUrl(overrides) {
+    var params = {sent:currentSent,date:currentDate,period:currentPeriod,date_from:'{{ date_from|default:"" }}',date_to:'{{ date_to|default:"" }}',customer:'{{ request.GET.customer|default:"" }}',staff:'{{ request.GET.staff|default:"" }}',status:'{{ request.GET.status|default:"" }}'};
+    for(var k in overrides) params[k]=overrides[k];
+    var parts=[];
+    for(var k in params) { if(params[k]!=='') parts.push(k+'='+encodeURIComponent(params[k])); }
+    return '{% url "invoice_list" %}'+(parts.length?'?'+parts.join('&'):'');
+    }function applyRange() {
+        var from = document.getElementById('date-from').value;
+        var to = document.getElementById('date-to').value;
+        if(!from && !to) return;
+        closeSheet('date');
+        window.location.href = buildUrl({date_from:from,date_to:to,period:'',date:''});
+    }
+var filterCustInput = document.getElementById('filter-customer-input');
+var filterCustSugg = document.getElementById('filter-customer-suggestions');
+if (filterCustInput) {
+    filterCustInput.addEventListener('focus', function() { filterCustSugg.style.display = 'block'; });
+    filterCustInput.addEventListener('input', function() {
+        var q = this.value.toLowerCase();
+        filterCustSugg.style.display = 'block';
+        var items = filterCustSugg.querySelectorAll('div');
+        items.forEach(function(item) {
+            item.style.display = item.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+    });
+    document.addEventListener('click', function(e) {
+        if (!filterCustInput.contains(e.target) && !filterCustSugg.contains(e.target)) {
+            filterCustSugg.style.display = 'none';
+        }
+    });
+}
+function selectFilterCustomer(id, name) {
+    document.getElementById('filter-customer-id').value = id;
+    document.getElementById('filter-customer-input').value = id ? name : '';
+    document.getElementById('filter-customer-suggestions').style.display = 'none';
+}
+// Staff filter autocomplete
+var filterStaffInput = document.getElementById('filter-staff-input');
+var filterStaffSugg = document.getElementById('filter-staff-suggestions');
+if (filterStaffInput) {
+    filterStaffInput.addEventListener('focus', function() { filterStaffSugg.style.display = 'block'; });
+    filterStaffInput.addEventListener('input', function() {
+        var q = this.value.toLowerCase();
+        filterStaffSugg.style.display = 'block';
+        filterStaffSugg.querySelectorAll('div').forEach(function(item) {
+            item.style.display = item.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+    });
+    document.addEventListener('click', function(e) {
+        if (filterStaffInput && !filterStaffInput.contains(e.target) && !filterStaffSugg.contains(e.target)) {
+            filterStaffSugg.style.display = 'none';
+        }
+    });
+}
+function selectFilterStaff(id, name) {
+    document.getElementById('filter-staff-id').value = id;
+    document.getElementById('filter-staff-input').value = name;
+    document.getElementById('filter-staff-suggestions').style.display = 'none';
+}
 
-function switchSent(sent) {
-    var url = '{% url "invoice_list" %}';
-    var params = [];
-    if (sent !== '') params.push('sent=' + sent);
-    if (currentDate) params.push('date=' + currentDate);
-    if (params.length) url += '?' + params.join('&');
-    window.location.href = url;
+// Status buttons
+function selectStatus(val) {
+    document.getElementById('filter-status-val').value = val;
+    document.querySelectorAll('.status-btn').forEach(function(btn) {
+        btn.classList.toggle('status-btn-active', btn.getAttribute('data-val') === val);
+    });
 }
-function getTodayStr() {
-    return new Date().toISOString().split('T')[0];
-}
-function navigateDate(dateStr) {
-    var sent = '{{ request.GET.sent|default:"" }}';
-    var url = '{% url "invoice_list" %}?date=' + dateStr;
-    if (sent !== '') url += '&sent=' + sent;
-    window.location.href = url;
-}
-document.getElementById('prev-date').addEventListener('click', function () {
-    var base = currentDate || getTodayStr();
-    var d = new Date(base + 'T00:00:00'); d.setDate(d.getDate() - 1);
-    navigateDate(d.toISOString().split('T')[0]);
-});
-document.getElementById('next-date').addEventListener('click', function () {
-    var base = currentDate || getTodayStr();
-    var d = new Date(base + 'T00:00:00'); d.setDate(d.getDate() + 1);
-    navigateDate(d.toISOString().split('T')[0]);
-});
-document.getElementById('date-label-btn').addEventListener('click', function () {
-    navigateDate(getTodayStr());
-});
 </script>
 {% endblock %}

@@ -5,6 +5,8 @@ from django.utils.decorators import method_decorator
 from django.views import View
 from .models import Customer
 from .forms import CustomerForm, CustomerEmailFormSet
+from django.http import JsonResponse
+import json
 
 
 @method_decorator(login_required, name='dispatch')
@@ -117,3 +119,43 @@ class CustomerDeleteView(View):
         customer.delete()
         messages.success(request, f'Customer {name} deleted successfully.')
         return redirect('customer_list')
+
+
+@method_decorator(login_required, name='dispatch')
+class CustomerQuickCreateView(View):
+    def post(self, request):
+        try:
+            data = json.loads(request.body)
+            name = data.get('name', '').strip()
+            email = data.get('email', '').strip()
+            phone = data.get('phone', '').strip()
+
+            if not name:
+                return JsonResponse({'error': 'Name is required'}, status=400)
+            if not email:
+                return JsonResponse({'error': 'Email is required'}, status=400)
+
+            if Customer.objects.filter(name__iexact=name).exists():
+                return JsonResponse({'error': f'Customer "{name}" already exists'}, status=400)
+
+            customer = Customer.objects.create(name=name, phone=phone)
+            from .models import CustomerEmail
+            CustomerEmail.objects.create(customer=customer, email=email, is_primary=True)
+
+            return JsonResponse({'success': True, 'name': customer.name, 'id': customer.pk})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+@method_decorator(login_required, name='dispatch')
+class CustomerAddEmailView(View):
+    def post(self, request, pk):
+        from .models import CustomerEmail
+        customer = get_object_or_404(Customer, pk=pk)
+        email = request.POST.get('email', '').strip()
+        if email:
+            if not CustomerEmail.objects.filter(customer=customer, email=email).exists():
+                CustomerEmail.objects.create(customer=customer, email=email, is_primary=False)
+                from django.http import JsonResponse
+                return JsonResponse({'success': True})
+        from django.http import JsonResponse
+        return JsonResponse({'error': 'Invalid or duplicate email'}, status=400)

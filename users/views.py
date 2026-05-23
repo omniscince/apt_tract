@@ -5,7 +5,7 @@ from django.contrib import messages
 from django.utils.decorators import method_decorator
 from django.views import View
 from .models import User
-from .forms import LoginForm, UserCreateForm
+from .forms import LoginForm, UserCreateForm, ProfileForm
 
 
 class LoginView(View):
@@ -38,10 +38,10 @@ class LogoutView(View):
 @method_decorator(login_required, name='dispatch')
 class UserListView(View):
     def get(self, request):
-        if not request.user.is_owner:
+        if request.user.role not in ('owner', 'staff'):
             messages.error(request, 'Access denied')
             return redirect('dashboard')
-        users = User.objects.all().order_by('role', 'email')
+        users = User.objects.all().order_by('role', 'email') if request.user.is_owner else None
         return render(request, 'users/user_list.html', {'users': users})
 
 
@@ -71,28 +71,40 @@ class UserCreateView(View):
 @method_decorator(login_required, name='dispatch')
 class UserEditView(View):
     def get(self, request, pk):
-        if not request.user.is_owner:
+        user = get_object_or_404(User, pk=pk)
+        if not request.user.is_owner and request.user.pk != pk:
             messages.error(request, 'Access denied')
             return redirect('dashboard')
-        user = get_object_or_404(User, pk=pk)
-        form = UserCreateForm(instance=user)
-        return render(request, 'users/user_form.html', {'form': form, 'title': 'Edit User', 'edit': True})
+        if request.user.is_owner:
+            form = UserCreateForm(instance=user)
+        else:
+            form = ProfileForm(instance=user)
+        return render(request, 'users/user_form.html', {
+            'form': form, 'title': 'Edit Profile', 'edit': True,
+            'is_owner': request.user.is_owner
+        })
 
     def post(self, request, pk):
-        if not request.user.is_owner:
+        user = get_object_or_404(User, pk=pk)
+        if not request.user.is_owner and request.user.pk != pk:
             messages.error(request, 'Access denied')
             return redirect('dashboard')
-        user = get_object_or_404(User, pk=pk)
-        form = UserCreateForm(request.POST, instance=user)
+        if request.user.is_owner:
+            form = UserCreateForm(request.POST, instance=user)
+        else:
+            form = ProfileForm(request.POST, instance=user)
         if form.is_valid():
             u = form.save(commit=False)
             password = form.cleaned_data.get('password')
             if password:
                 u.set_password(password)
             u.save()
-            messages.success(request, f'User {u.email} updated!')
+            messages.success(request, 'Profile updated!')
             return redirect('user_list')
-        return render(request, 'users/user_form.html', {'form': form, 'title': 'Edit User', 'edit': True})
+        return render(request, 'users/user_form.html', {
+            'form': form, 'title': 'Edit Profile', 'edit': True,
+            'is_owner': request.user.is_owner
+        })
 
 
 @method_decorator(login_required, name='dispatch')
@@ -112,3 +124,31 @@ class UserDeleteView(View):
         user.delete()
         messages.success(request, 'User deleted')
         return redirect('user_list')
+
+
+@method_decorator(login_required, name='dispatch')
+class PasswordChangeView(View):
+    def get(self, request):
+        return render(request, 'users/password_change.html', {'title': 'Change Password'})
+
+    def post(self, request):
+        old_password = request.POST.get('old_password')
+        new_password = request.POST.get('new_password')
+        confirm_password = request.POST.get('confirm_password')
+
+        if not request.user.check_password(old_password):
+            messages.error(request, 'Current password is incorrect')
+            return render(request, 'users/password_change.html', {'title': 'Change Password'})
+
+        if new_password != confirm_password:
+            messages.error(request, 'New passwords do not match')
+            return render(request, 'users/password_change.html', {'title': 'Change Password'})
+
+        if len(new_password) < 6:
+            messages.error(request, 'Password must be at least 6 characters')
+            return render(request, 'users/password_change.html', {'title': 'Change Password'})
+
+        request.user.set_password(new_password)
+        request.user.save()
+        messages.success(request, 'Password changed successfully')
+        return redirect('login')

@@ -1,98 +1,148 @@
 {% extends 'base.html' %}
 {% block title %}{{ customer.name }} - AutoPro{% endblock %}
 {% block page_title %}{{ customer.name }}{% endblock %}
+{% block desktop_page_title %}{{ customer.name }}{% endblock %}
+{% block back_link %}
+<a href="#" onclick="history.back();return false;" class="hdr-back"><i class="bi bi-chevron-left"></i> Back</a>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between mb-4">
-    <a href="{% url 'customer_list' %}" class="btn btn-outline-secondary btn-sm">← Back</a>
-    {% if user.role == 'owner' %}
-    <div class="d-flex gap-2">
-        <a href="{% url 'customer_edit' customer.pk %}" class="btn btn-outline-primary btn-sm">Edit</a>
-        <button type="button" class="btn btn-outline-danger btn-sm" onclick="document.getElementById('delete-modal').style.display='flex'">Delete</button>
+<div class="page-inner">
+
+    <!-- Action buttons -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+        {% if user.role == 'owner' %}
+        <a href="{% url 'customer_edit' customer.pk %}" class="ap-btn ap-btn-outline ap-btn-sm">
+            <i class="bi bi-pencil"></i> Edit
+        </a>
+        <button onclick="openSheet('delete')" class="ap-btn ap-btn-sm" style="background:#fce8e8;color:var(--danger);border:none;">
+            <i class="bi bi-trash"></i> Delete
+        </button>
+        {% endif %}
     </div>
-    {% endif %}
-</div>
-<div class="row g-4">
-    <div class="col-md-4">
-        <div class="card p-3">
-            <h5>Contact Info</h5>
-            <hr>
-            <p><strong>Name:</strong> {{ customer.name }}</p>
-            {% if customer.company %}<p><strong>Company:</strong> {{ customer.company }}</p>{% endif %}
-            {% if customer.business_number %}<p><strong>BN:</strong> {{ customer.business_number }}</p>{% endif %}
-            <p><strong>Phone:</strong> {{ customer.phone|default:'-' }}</p>
-            {% if customer.address %}<p><strong>Address:</strong> {{ customer.address }}</p>{% endif %}
-            {% if customer.city %}<p><strong>City:</strong> {{ customer.city }}, {{ customer.province }}</p>{% endif %}
-            <hr>
-            <h6>Emails</h6>
-            {% for email in customer.emails.all %}
-            <p class="mb-1">
-                {{ email.email }}
-                {% if email.is_primary %}<span class="badge bg-primary ms-1">Primary</span>{% endif %}
-            </p>
-            {% empty %}
-            <p class="text-muted">No emails</p>
-            {% endfor %}
-        </div>
-    </div>
-    <div class="col-md-8">
-        <div class="card p-3 mb-3">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="mb-0">Cars</h5>
-            </div>
-            {% for car in cars %}
-            <div class="border rounded p-2 mb-2 d-flex justify-content-between align-items-center">
+
+    <!-- Contact Info -->
+    <div class="ap-card" style="margin-bottom:12px;">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border);">
+            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Contact Info</div>
+            <div class="info-grid" style="padding:0;">
                 <div>
-                    <strong>{{ car.make }} {{ car.model }}</strong>
-                    {% if car.year %} ({{ car.year }}){% endif %}
-                    {% if car.stock_number %} | Stock#: {{ car.stock_number }}{% endif %}
-                    {% if car.vin %} | VIN: {{ car.vin }}{% endif %}
-                    {% if car.get_last_invoice_date %}
-                    <br><small class="text-muted">Last invoice: {{ car.get_last_invoice_date|date:"N j, Y" }}</small>
-                    {% endif %}
+                    <div class="info-label">Name</div>
+                    <div class="info-value">{{ customer.name }}</div>
                 </div>
-                <a href="{% url 'car_detail' car.pk %}" class="btn btn-sm btn-outline-secondary">👁</a>
+                {% if customer.company %}
+                <div>
+                    <div class="info-label">Company</div>
+                    <div class="info-value">{{ customer.company }}</div>
+                </div>
+                {% endif %}
+                {% if customer.business_number %}
+                <div>
+                    <div class="info-label">Business #</div>
+                    <div class="info-value">{{ customer.business_number }}</div>
+                </div>
+                {% endif %}
+                <div>
+                    <div class="info-label">Phone</div>
+                    <div class="info-value">{{ customer.phone|default:'-' }}</div>
+                </div>
+                {% if customer.address %}
+                <div>
+                    <div class="info-label">Address</div>
+                    <div class="info-value">{{ customer.address }}</div>
+                </div>
+                {% endif %}
+                {% if customer.city %}
+                <div>
+                    <div class="info-label">City</div>
+                    <div class="info-value">{{ customer.city }}, {{ customer.province }}</div>
+                </div>
+                {% endif %}
             </div>
-            {% empty %}
-            <p class="text-muted">No cars</p>
+        </div>
+        {% if customer.emails.all %}
+        <div style="padding:12px 16px;">
+            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Emails</div>
+            {% for email in customer.emails.all %}
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                <i class="bi bi-envelope" style="color:var(--brand);font-size:14px;"></i>
+                <span style="font-size:14px;">{{ email.email }}</span>
+                {% if email.is_primary %}<span class="ap-badge badge-final">Primary</span>{% endif %}
+            </div>
             {% endfor %}
         </div>
-        <div class="card p-3">
-            <h5 class="mb-3">Invoice History</h5>
-            {% for inv in invoices %}
-            <div class="border-bottom py-2">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>{{ inv.invoice_number }}</strong>
-                        <small class="text-muted ms-2">{{ inv.invoice_date|date:"N j, Y" }}</small>
-                        {% if inv.car %}<small class="text-muted ms-2">— {{ inv.get_car_display }}</small>{% endif %}
-                    </div>
-                    <strong>${{ inv.total }}</strong>
-                </div>
-                <div class="mt-1">
-                    {% for item in inv.items.all %}
-                    <small class="d-block text-muted">• {{ item.description }} — ${{ item.price }}</small>
-                    {% endfor %}
+        {% endif %}
+    </div>
+
+    <!-- Cars -->
+    <div class="ap-card" style="margin-bottom:12px;">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:14px;font-weight:700;">Cars</span>
+            <a href="{% url 'car_create' %}?customer={{ customer.pk }}" style="font-size:13px;color:var(--brand);text-decoration:none;"><i class="bi bi-plus"></i> Add Car</a>
+        </div>
+        {% for car in cars %}
+        <a href="{% url 'car_detail' car.pk %}" class="ap-list-item">
+            <div class="ap-list-icon"><i class="bi bi-car-front"></i></div>
+            <div class="ap-list-content">
+                <div class="ap-list-title">{{ car.make }} {{ car.model }}{% if car.year %} ({{ car.year }}){% endif %}</div>
+                <div class="ap-list-sub">
+                    {% if car.stock_number %}Stock#: {{ car.stock_number }}{% endif %}
+                    {% if car.vin %} · VIN: {{ car.vin }}{% endif %}
                 </div>
             </div>
-            {% empty %}
-            <p class="text-muted">No invoices</p>
-            {% endfor %}
+            <i class="bi bi-chevron-right" style="color:var(--muted);"></i>
+        </a>
+        {% empty %}
+        <div style="padding:24px;text-align:center;color:var(--muted);font-size:14px;">No cars</div>
+        {% endfor %}
+    </div>
+
+    <!-- Invoice History -->
+    <div class="ap-card" style="margin-bottom:80px;">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:14px;font-weight:700;">Invoice History</span>
+            {% if user.role in 'owner,staff' %}
+            <a href="{% url 'invoice_create' %}?customer={{ customer.pk }}" style="font-size:13px;color:var(--brand);text-decoration:none;"><i class="bi bi-plus"></i> New Invoice</a>
+            {% endif %}
         </div>
+        {% for inv in invoices %}
+        <a href="{% url 'invoice_detail' inv.pk %}" class="ap-list-item">
+            <div class="ap-list-icon">
+                <i class="bi bi-{% if inv.email_sent %}envelope-check-fill{% else %}envelope{% endif %}"
+                   style="color:{% if inv.email_sent %}var(--success){% else %}var(--muted){% endif %};"></i>
+            </div>
+            <div class="ap-list-content">
+                <div class="ap-list-title">{{ inv.invoice_number }}</div>
+                <div class="ap-list-sub">{{ inv.invoice_date|date:"N j, Y" }}{% if inv.car %} · {{ inv.get_car_display|truncatechars:25 }}{% endif %}</div>
+            </div>
+            <div class="ap-list-right">
+                <div class="ap-list-amount">${{ inv.total }}</div>
+                <span class="ap-badge badge-{{ inv.status }}">{{ inv.status|upper }}</span>
+            </div>
+        </a>
+        {% empty %}
+        <div style="padding:24px;text-align:center;color:var(--muted);font-size:14px;">No invoices</div>
+        {% endfor %}
+    </div>
+
+</div>
+
+<!-- DELETE SHEET -->
+<div class="ap-overlay" id="delete-overlay" onclick="closeSheet('delete')"></div>
+<div class="ap-sheet" id="delete-sheet">
+    <span class="ap-sheet-handle"></span>
+    <div style="text-align:center;padding:8px 0 16px;">
+        <i class="bi bi-trash-fill" style="font-size:36px;color:var(--danger);display:block;margin-bottom:10px;"></i>
+        <div style="font-size:16px;font-weight:700;margin-bottom:8px;">Delete {{ customer.name }}?</div>
+        <div style="font-size:14px;color:var(--muted);">This action cannot be undone.</div>
+    </div>
+    <div class="ap-sheet-actions">
+        <form method="post" action="{% url 'customer_delete' customer.pk %}" style="flex:1;">
+            {% csrf_token %}
+            <button type="submit" class="ap-btn ap-btn-danger ap-btn-full">Delete</button>
+        </form>
+        <button onclick="closeSheet('delete')" class="ap-btn ap-btn-outline" style="flex:1;">Cancel</button>
     </div>
 </div>
 
-<!-- Delete Modal -->
-<div id="delete-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
-    <div class="card p-4" style="max-width:400px;width:90%;">
-        <h5>Delete Customer</h5>
-        <p>Are you sure you want to delete <strong>{{ customer.name }}</strong>?</p>
-        <div class="d-flex gap-2 justify-content-end">
-            <button class="btn btn-outline-secondary" onclick="document.getElementById('delete-modal').style.display='none'">Cancel</button>
-            <form method="post" action="{% url 'customer_delete' customer.pk %}">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-danger">Delete</button>
-            </form>
-        </div>
-    </div>
-</div>
 {% endblock %}
