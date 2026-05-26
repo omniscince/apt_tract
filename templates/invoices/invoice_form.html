@@ -142,6 +142,7 @@ var customerInput = document.getElementById('id_customer_name');
 var suggestions = document.getElementById('customer-suggestions');
 var quickPanel = document.getElementById('quick-create-panel');
 var customerFound = false;
+if (customerInput && customerInput.value.trim()) { customerFound = true; }
 
 if (!customerInput) return;
 

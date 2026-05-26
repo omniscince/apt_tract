@@ -82,7 +82,9 @@
                         {% endif %}
                         {% if user.role == 'owner' %}
                         <form method="post" action="{% url 'customer_delete' c.pk %}" class="d-inline" onsubmit="return confirm('Delete {{ c.name }}?')">
-                            {% csrf_token %}<button class="ap-btn ap-btn-danger ap-btn-sm"><i class="bi bi-trash"></i></button>
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{% url 'customer_list' %}{% if q %}?q={{ q }}{% endif %}">
+                            <button class="ap-btn ap-btn-danger ap-btn-sm"><i class="bi bi-trash"></i></button>
                         </form>
                         {% endif %}
                     </td>
@@ -128,5 +130,24 @@ function filterCustomers(q) {
         item.style.display = item.getAttribute('data-name').includes(q) ? '' : 'none';
     });
 }
+</script>
+<script>
+// Save search query in localStorage
+document.addEventListener('DOMContentLoaded', function() {
+    var searchInput = document.querySelector('input[name="q"]');
+    if (!searchInput) return;
+    var saved = localStorage.getItem('customer_search_q');
+    if (saved && !searchInput.value) {
+        // Don't auto-fill, just remember
+    }
+    searchInput.addEventListener('input', function() {
+        localStorage.setItem('customer_search_q', this.value);
+    });
+    // Clear on empty search
+    var resetBtn = document.querySelector('a[href*="customer_list"]:not([class*="ap-list"])');
+    if (resetBtn) resetBtn.addEventListener('click', function() {
+        localStorage.removeItem('customer_search_q');
+    });
+});
 </script>
 {% endblock %}
