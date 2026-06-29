@@ -17,6 +17,9 @@ urlpatterns = [
     path('invoices/statement-preview/', views.StatementPreviewView.as_view(), name='statement_preview'),
     path('reports/invoice-history/', views.InvoiceHistoryReportView.as_view(), name='invoice_history_report'),
     path('reports/crew/', views.CrewReportView.as_view(), name='crew_report'),
+    path('reports/menu/', views.MobileReportsView.as_view(), name='mobile_reports'),
     path('reports/customers/', views.CustomerReportView.as_view(), name='customer_report'),
     path('download-db/', views.DownloadDatabaseView.as_view(), name='download_db'),
+    path('invoices/save-draft/', views.SaveDraftView.as_view(), name='save_draft'),
+    path('invoices/delete-draft/', views.DeleteDraftView.as_view(), name='delete_draft'),
 ]

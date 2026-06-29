@@ -20,6 +20,15 @@
             <a href="{% url 'invoice_edit' invoice.pk %}" class="ap-btn ap-btn-outline ap-btn-sm">
                 <i class="bi bi-pencil"></i> Edit
             </a>
+            {% if invoice.status == 'draft' %}
+            <form method="post" action="{% url 'invoice_action' invoice.pk %}" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="finish">
+                <button type="submit" class="ap-btn ap-btn-sm" style="background:var(--success);color:white;border:none;">
+                    <i class="bi bi-check-circle-fill"></i> Finish Invoice
+                </button>
+            </form>
+            {% endif %}
             {% endif %}
             <button class="ap-btn ap-btn-outline ap-btn-sm" onclick="openActions()">
                 <i class="bi bi-three-dots"></i>
@@ -115,12 +124,7 @@
             <span style="font-size:14px;color:var(--muted);">Sub Total</span>
             <span style="font-size:14px;font-weight:600;">${{ invoice.subtotal }}</span>
         </div>
-        {% if invoice.hst > 0 %}
-        <div style="display:flex;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
-            <span style="font-size:14px;color:var(--muted);">Plus Applicable Taxes (HST 13%)</span>
-            <span style="font-size:14px;font-weight:600;">${{ invoice.hst }}</span>
-        </div>
-        {% endif %}
+
         <div style="display:flex;justify-content:space-between;padding:16px;background:#f7f8fc;">
             <span style="font-size:18px;font-weight:700;">Total</span>
             <span style="font-size:22px;font-weight:700;color:var(--brand);">${{ invoice.total }}</span>
@@ -147,6 +151,16 @@
         <i class="bi bi-chevron-right" style="color:var(--muted);"></i>
     </button>
 
+    {% if invoice.status == 'draft' %}
+    <form method="post" action="{% url 'invoice_action' invoice.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="finish">
+        <button type="submit" class="ap-list-item" style="border-radius:10px;border:1px solid #d4edda;margin-bottom:8px;width:100%;background:none;cursor:pointer;text-align:left;">
+            <div class="ap-list-icon" style="background:#d4edda;"><i class="bi bi-check-circle-fill" style="color:var(--success);"></i></div>
+            <div class="ap-list-content"><div class="ap-list-title" style="color:var(--success);">Finish Invoice</div></div>
+        </button>
+    </form>
+    {% endif %}
     {% if invoice.status != 'cancelled' %}
     <button onclick="openCancelConfirm()" class="ap-list-item" style="border-radius:10px;border:1px solid #fce8e8;margin-bottom:8px;width:100%;background:none;cursor:pointer;text-align:left;">
         <div class="ap-list-icon" style="background:#fce8e8;"><i class="bi bi-x-circle" style="color:var(--danger);"></i></div>
@@ -259,11 +273,20 @@ function closeSendSheet()    { closeSheet('send'); }
 function openSheet(name) {
     document.getElementById(name+'-overlay').classList.add('open');
     document.getElementById(name+'-sheet').classList.add('open');
+    history.pushState({sheet:name}, "");
+}
+function _hideSheet(name) {
+    var o=document.getElementById(name+'-overlay'), sh=document.getElementById(name+'-sheet');
+    if(o)o.classList.remove('open'); if(sh)sh.classList.remove('open');
 }
 function closeSheet(name) {
-    document.getElementById(name+'-overlay').classList.remove('open');
-    document.getElementById(name+'-sheet').classList.remove('open');
+    if(history.state && history.state.sheet===name){ history.back(); }
+    else { _hideSheet(name); }
 }
+window.addEventListener("popstate", function(){
+    document.querySelectorAll(".ap-overlay.open").forEach(function(o){o.classList.remove("open");});
+    document.querySelectorAll(".ap-sheet.open").forEach(function(sh){sh.classList.remove("open");});
+});
 
 function removeEmail(btn) {
     var row = btn.closest('.email-row');

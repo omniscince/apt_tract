@@ -55,13 +55,12 @@ class Invoice(models.Model):
     @property
     def hst(self):
         from decimal import Decimal
-        from django.conf import settings
-        rate = getattr(settings, 'HST_RATE', Decimal('0.13'))
+        rate = Decimal('0')
         return round(self.subtotal * Decimal(str(rate)), 2)
 
     @property
     def total(self):
-        return round(self.subtotal + self.hst, 2)
+        return round(self.subtotal, 2)
 
     def save(self, *args, **kwargs):
         if not self.invoice_number:

@@ -1,9 +1,14 @@
 from django.db import models
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_exempt
 from django.contrib import messages
 from django.utils.decorators import method_decorator
 from django.views import View
+import logging
+logger = logging.getLogger('invoices')
+import logging
+logger = logging.getLogger('invoices')
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.core.mail import EmailMessage
@@ -131,6 +136,15 @@ class DashboardView(View):
         my_count = len(my_invoices_today)
 
         from users.models import User as UserModel
+        if user.role == 'staff':
+            draft_invoices = Invoice.objects.filter(
+                status='draft'
+            ).filter(
+                models.Q(created_by=user) | models.Q(work_completed_by=user)
+            ).select_related('customer', 'car').order_by('-created_at')
+        else:
+            draft_invoices = Invoice.objects.filter(status='draft').select_related('customer', 'car').order_by('-created_at')
+
         context = {
             'total_invoices': len(invoices_list),
             'total_customers': Customer.objects.count(),
@@ -138,6 +152,8 @@ class DashboardView(View):
             'my_amount': my_amount,
             'my_count': my_count,
             'recent_invoices': invoices_list[:20],
+            'draft_invoices': draft_invoices,
+            'draft_count': draft_invoices.count(),
             'period': period,
             'date_from': date_from,
             'date_to': date_to,
@@ -167,13 +183,22 @@ class InvoiceListView(View):
         month       = request.GET.get('month')
         year        = request.GET.get('year')
         vin         = request.GET.get('vin')
+        stock       = request.GET.get('stock', '')
         status      = request.GET.get('status')
         sent        = request.GET.get('sent', '')
         period      = request.GET.get('period', '')
         specific_date = request.GET.get('date', '')
 
         if q:
-            invoices = invoices.filter(invoice_number__icontains=q)
+            from django.db.models import Q as _Q
+            invoices = invoices.filter(
+                _Q(invoice_number__icontains=q) |
+                _Q(customer_name__icontains=q) |
+                _Q(customer__name__icontains=q) |
+                _Q(car__stock_number__icontains=q) |
+                _Q(car__vin__icontains=q) |
+                _Q(car_info__icontains=q)
+            ).distinct()
         if customer_id and customer_id.isdigit():
             invoices = invoices.filter(customer_id=customer_id)
         if staff_id and staff_id.isdigit() and user.role != 'staff':
@@ -184,6 +209,8 @@ class InvoiceListView(View):
             invoices = invoices.filter(invoice_date__year=year)
         if vin:
             invoices = invoices.filter(car__vin__icontains=vin)
+        if stock:
+            invoices = invoices.filter(car__stock_number__icontains=stock)
         if status:
             invoices = invoices.filter(status=status)
         if sent == '1':
@@ -212,11 +239,17 @@ class InvoiceListView(View):
         invoices = invoices.order_by('-invoice_date', '-invoice_number')
 
         from users.models import User
+        from django.core.paginator import Paginator
         customers = Customer.objects.all()
         staff_list = User.objects.all()
 
+        paginator = Paginator(invoices, 25)
+        page_number = request.GET.get('page', 1)
+        page_obj = paginator.get_page(page_number)
+
         return render(request, 'invoices/invoice_list.html', {
-            'invoices': invoices,
+            'invoices': page_obj,
+            'page_obj': page_obj,
             'customers': customers,
             'staff_list': staff_list,
             'active_period': active_period,
@@ -255,6 +288,7 @@ class InvoiceCreateView(View):
             invoice.save()
             formset.instance = invoice
             formset.save()
+            logger.info(f'CREATED invoice={invoice.invoice_number} customer="{invoice.get_customer_display()}" total={invoice.total} user={request.user.email} status={invoice.status}')
             messages.success(request, f'Invoice #{invoice.invoice_number} created!')
             return redirect('invoice_detail', pk=invoice.pk)
         return render(request, 'invoices/invoice_form.html', {
@@ -305,8 +339,11 @@ class InvoiceEditView(View):
                 if num:
                     invoice.invoice_number = num
             invoice = get_or_create_customer_and_car(form, invoice)
+            if invoice.status == 'draft':
+                invoice.status = 'final'
             invoice.save()
             formset.save()
+            logger.info(f'UPDATED invoice={invoice.invoice_number} customer="{invoice.get_customer_display()}" total={invoice.total} user={request.user.email} status={invoice.status}')
             messages.success(request, f'Invoice #{invoice.invoice_number} updated!')
             return redirect('invoice_detail', pk=invoice.pk)
         return render(request, 'invoices/invoice_form.html', {
@@ -381,7 +418,7 @@ class InvoiceActionView(View):
             invoice.save()
             messages.success(request, 'Invoice cancelled')
 
-        elif action == 'final':
+        elif action == 'final' or action == 'finish':
             invoice.status = 'final'
             invoice.save()
             messages.success(request, 'Invoice marked as final')
@@ -445,6 +482,7 @@ class MonthlyReportView(View):
         date_from = request.GET.get('date_from')
         date_to = request.GET.get('date_to')
         vin = request.GET.get('vin')
+        stock = request.GET.get('stock')
 
         if customer_id:
             invoices = invoices.filter(customer_id=customer_id)
@@ -466,6 +504,8 @@ class MonthlyReportView(View):
             invoices = invoices.filter(invoice_date__lte=date_to)
         if vin:
             invoices = invoices.filter(car__vin__icontains=vin)
+        if stock:
+            invoices = invoices.filter(car__stock_number__icontains=stock)
 
         from users.models import User
         customers = Customer.objects.all()
@@ -514,6 +554,8 @@ class MonthlyReportPDFView(View):
             invoices = invoices.filter(invoice_date__lte=date_to)
         if vin:
             invoices = invoices.filter(car__vin__icontains=vin)
+        if stock:
+            invoices = invoices.filter(car__stock_number__icontains=stock)
 
         customer = None
         if customer_id:
@@ -621,6 +663,8 @@ class InvoiceHistoryReportView(View):
             invoices = invoices.filter(invoice_date__lte=date_to)
         if vin:
             invoices = invoices.filter(car__vin__icontains=vin)
+        if stock:
+            invoices = invoices.filter(car__stock_number__icontains=stock)
 
         wb = openpyxl.Workbook()
         ws = wb.active
@@ -681,6 +725,14 @@ class InvoiceHistoryReportView(View):
 
 
 @method_decorator(login_required, name='dispatch')
+@method_decorator(login_required, name='dispatch')
+class MobileReportsView(View):
+    def get(self, request):
+        if request.user.role not in ('owner', 'accountant'):
+            return redirect('dashboard')
+        return render(request, 'invoices/mobile_reports.html')
+
+
 class CrewReportView(View):
     def get(self, request):
         if request.user.role != 'owner':
@@ -691,7 +743,7 @@ class CrewReportView(View):
         start = request.GET.get('start')
         end = request.GET.get('end')
 
-        invoices = Invoice.objects.all().select_related('work_completed_by')
+        invoices = Invoice.objects.filter(status='final').select_related('work_completed_by')
         if start:
             invoices = invoices.filter(invoice_date__gte=parse_date(start))
         if end:
@@ -757,17 +809,123 @@ class CustomerReportView(View):
         })
 
 
-@method_decorator(login_required, name='dispatch')
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class SaveDraftView(View):
+    def post(self, request):
+        import json
+        from django.http import JsonResponse
+        if not request.user.is_authenticated:
+            return JsonResponse({'error': 'unauthorized'}, status=401)
+        try:
+            data = json.loads(request.body)
+        except Exception:
+            return JsonResponse({'error': 'invalid json'}, status=400)
+
+        customer_name = data.get('customer_name', '').strip()
+        car_make = data.get('car_make', '').strip()
+        if not customer_name and not car_make:
+            return JsonResponse({'error': 'empty'}, status=400)
+
+        # get or create customer
+        from customers.models import Customer
+        customer = None
+        if customer_name:
+            customer = Customer.objects.filter(name__iexact=customer_name).first()
+            if not customer:
+                customer = Customer.objects.create(name=customer_name.upper())
+
+        # get or create car
+        from cars.models import Car
+        car = None
+        car_vin = data.get('car_vin', '').strip().upper()
+        car_model = data.get('car_model', '').strip().upper()
+        car_stock = data.get('car_stock', '').strip().upper()
+        if customer and car_make:
+            if car_vin:
+                car = Car.objects.filter(vin=car_vin).first()
+            if not car:
+                car = Car.objects.create(
+                    customer=customer,
+                    make=car_make.upper(),
+                    model=car_model,
+                    vin=car_vin,
+                    stock_number=car_stock,
+                )
+
+        from datetime import date
+        from dateutil.parser import parse as parse_date_str
+        invoice_date_str = data.get('invoice_date') or str(date.today())
+        try:
+            invoice_date = parse_date_str(invoice_date_str).date()
+        except Exception:
+            invoice_date = date.today()
+
+        # delete old drafts by this user without invoice_number
+        Invoice.objects.filter(
+            created_by=request.user,
+            status='draft',
+        ).delete()
+
+        invoice = Invoice.objects.create(
+            customer=customer,
+            car=car,
+            status='draft',
+            invoice_date=invoice_date,
+            po_number=data.get('po_number', ''),
+            notes=data.get('notes', ''),
+            created_by=request.user,
+            work_completed_by=request.user,
+        )
+
+        services = data.get('services', [])
+        from invoices.models import InvoiceItem
+        for s in services:
+            desc = s.get('desc', '').strip()
+            price = s.get('price', 0)
+            if desc:
+                try:
+                    price = float(price)
+                except Exception:
+                    price = 0
+                InvoiceItem.objects.create(invoice=invoice, description=desc.upper(), price=price)
+
+        return JsonResponse({'ok': True, 'pk': invoice.pk})
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class DeleteDraftView(View):
+    def post(self, request):
+        from django.http import JsonResponse
+        if not request.user.is_authenticated:
+            return JsonResponse({'error': 'unauthorized'}, status=401)
+        Invoice.objects.filter(created_by=request.user, status='draft').delete()
+        return JsonResponse({'ok': True})
+
+
 class DownloadDatabaseView(View):
     def get(self, request):
         if request.user.role != 'owner':
             return redirect('dashboard')
-        import os
+        import subprocess
         from django.conf import settings as django_settings
-        db_path = django_settings.DATABASES['default']['NAME']
         from datetime import date as _date
-        site_name = 'devapt' if 'apt_tract_dev' in str(db_path) else 'apt'
-        with open(db_path, 'rb') as f:
-            response = HttpResponse(f.read(), content_type='application/octet-stream')
-        response['Content-Disposition'] = f'attachment; filename="db_{site_name}_{_date.today()}.sqlite3"'
-        return response
+        dbcfg = django_settings.DATABASES['default']
+        db_name = dbcfg['NAME']
+        site_name = 'devapt' if 'dev' in str(db_name) else 'apt'
+        if 'postgresql' in dbcfg['ENGINE']:
+            dump = subprocess.run(
+                ['docker', 'exec', 'apt_postgres', 'pg_dump', '-U', 'postgres', str(db_name)],
+                capture_output=True
+            )
+            if dump.returncode != 0:
+                return HttpResponse('Backup failed: ' + dump.stderr.decode()[:500], status=500)
+            response = HttpResponse(dump.stdout, content_type='application/sql')
+            response['Content-Disposition'] = f'attachment; filename="db_{site_name}_{_date.today()}.sql"'
+            return response
+        else:
+            with open(db_name, 'rb') as f:
+                response = HttpResponse(f.read(), content_type='application/octet-stream')
+            response['Content-Disposition'] = f'attachment; filename="db_{site_name}_{_date.today()}.sqlite3"'
+            return response

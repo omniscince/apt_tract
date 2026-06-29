@@ -9,33 +9,68 @@
 
 {% block content %}
 <div style="padding:16px;">
-    <div class="ap-card" style="margin-bottom:16px;">
-        <div class="ap-card-body">
-            <form method="get" style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;">
-                <div>
-                    <label class="ap-label">From</label>
-                    <input type="date" name="start" value="{{ start }}" class="form-control" style="width:160px;">
-                </div>
-                <div>
-                    <label class="ap-label">To</label>
-                    <input type="date" name="end" value="{{ end }}" class="form-control" style="width:160px;">
-                </div>
-                <button type="submit" class="ap-btn ap-btn-primary ap-btn-sm"><i class="bi bi-funnel"></i> Run</button>
-                <a href="{% url 'crew_report' %}" class="ap-btn ap-btn-outline ap-btn-sm">Reset</a>
-            </form>
+
+    <div id="crew-filter">
+        <div class="ap-card" style="margin-bottom:16px;">
+            <div class="ap-card-body">
+                <form method="get">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+                        <div>
+                            <label class="ap-label">From</label>
+                            <input type="date" name="start" value="{{ start }}" class="form-control" style="width:100%;">
+                        </div>
+                        <div>
+                            <label class="ap-label">To</label>
+                            <input type="date" name="end" value="{{ end }}" class="form-control" style="width:100%;">
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <button type="submit" class="ap-btn ap-btn-primary ap-btn-sm" style="flex:1;"><i class="bi bi-funnel"></i> Run Report</button>
+                        <a href="{% url 'crew_report' %}" class="ap-btn ap-btn-outline ap-btn-sm">Reset</a>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
-    {% if rows %}
-    <div class="ap-card" style="margin-bottom:16px;">
-        <div class="ap-card-body" style="display:flex;justify-content:space-between;align-items:center;">
-            <span style="font-size:14px;color:var(--muted);font-weight:600;">{{ total_count }} invoices total</span>
-            <span style="font-size:22px;font-weight:700;color:var(--success);">${{ total_gross|floatformat:2 }}</span>
-        </div>
-    </div>
-    {% endif %}
 
-    <div class="ap-card">
+
+    <!-- MOBILE -->
+    <div id="crew-mobile">
+        {% for row in rows %}
+        <div class="ap-card crew-card" style="margin-bottom:10px;" onclick="showCrewDetail('{{ row.user.pk }}', '{{ row.user.get_full_name|default:row.user.email }}')">
+            <div class="ap-card-body">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="font-size:15px;font-weight:700;">{{ row.user.get_full_name|default:row.user.email }} <i class="bi bi-chevron-right" style="font-size:12px;color:var(--muted);"></i></span>
+                    <span style="font-size:18px;font-weight:700;color:var(--success);">${{ row.gross|floatformat:2 }}</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);">
+                    <span>{{ row.count }} invoices</span>
+                    <span>Subtotal ${{ row.subtotal|floatformat:2 }}</span>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="ap-card"><div class="ap-card-body" style="text-align:center;color:var(--muted);padding:32px;">No data</div></div>
+        {% endfor %}
+        {% if rows %}
+        <div class="ap-card" style="margin-top:4px;">
+            <div class="ap-card-body">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="font-size:15px;font-weight:700;">TOTAL</span>
+                    <span style="font-size:18px;font-weight:700;color:var(--success);">${{ total_gross|floatformat:2 }}</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);">
+                    <span>{{ total_count }} invoices</span>
+                    <span>Subtotal ${{ total_subtotal|floatformat:2 }}</span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- DESKTOP -->
+    <div id="crew-desktop" class="ap-card">
         <table class="ap-table">
             <thead>
                 <tr>
@@ -47,7 +82,7 @@
             </thead>
             <tbody>
                 {% for row in rows %}
-                <tr>
+                <tr style="cursor:pointer;" onclick="window.location='/invoices/?staff={{ row.user.pk }}&status=final'">
                     <td><strong>{{ row.user.get_full_name|default:row.user.email }}</strong></td>
                     <td style="text-align:center;">{{ row.count }}</td>
                     <td style="text-align:right;">${{ row.subtotal|floatformat:2 }}</td>
@@ -69,5 +104,25 @@
             {% endif %}
         </table>
     </div>
+
 </div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+@media (max-width:767px) { #crew-desktop{display:none;} #crew-mobile{display:block;} }
+@media (min-width:768px) { #crew-mobile{display:none;} #crew-desktop{display:block;} }
+.crew-card { cursor:pointer; }
+.crew-card:active { opacity:0.85; }
+</style>
+<script>
+function showCrewDetail(userId, userName) {
+    var start = document.querySelector('input[name="start"]').value;
+    var end = document.querySelector('input[name="end"]').value;
+    var url = '/invoices/?staff=' + userId + '&status=final';
+    if (start) url += '&date_from=' + start;
+    if (end) url += '&date_to=' + end;
+    window.location.href = url;
+}
+</script>
 {% endblock %}

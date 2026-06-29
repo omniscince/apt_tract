@@ -34,6 +34,22 @@
 
 <!-- ========== MOBILE ========== -->
 <div id="mobile-dash">
+    {% if draft_count %}
+    <a href="{% url 'invoice_list' %}?status=draft" style="text-decoration:none;display:block;padding:12px 16px 0;">
+        <div style="background:#ffecec;border:0.5px solid #ffb3b3;border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:10px;">
+            <div style="width:38px;height:38px;border-radius:8px;background:#ff4444;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="bi bi-file-earmark-x-fill" style="color:white;font-size:20px;"></i>
+            </div>
+            <div style="flex:1;">
+                <div style="font-size:14px;font-weight:600;color:#cc3333;">{{ draft_count }} незаконченн{{ draft_count|pluralize:"ый,ых" }} инвойс{{ draft_count|pluralize:",,ов" }}</div>
+                <div style="font-size:12px;color:#a03030;">
+                    {% for inv in draft_invoices|slice:":3" %}{{ inv.customer.name }}{% if not forloop.last %} · {% endif %}{% endfor %}
+                </div>
+            </div>
+            <i class="bi bi-chevron-right" style="color:#cc3333;font-size:16px;"></i>
+        </div>
+    </a>
+    {% endif %}
     <div class="home-grid">
         <a href="{% url 'customer_list' %}" class="home-tile">
             <i class="bi bi-person-fill"></i><span>Customers</span>
@@ -49,6 +65,11 @@
         <a href="{% url 'user_list' %}" class="home-tile">
             <i class="bi bi-gear-fill"></i><span>Settings</span>
         </a>
+        {% if user.role in 'owner,accountant' %}
+        <a href="{% url 'mobile_reports' %}" class="home-tile home-tile-wide">
+            <i class="bi bi-bar-chart-fill"></i><span>Reports</span>
+        </a>
+        {% endif %}
     </div>
 
     <!-- My Day mobile -->
@@ -133,7 +154,7 @@
                 <button type="button" onclick="setPeriod('today')" class="{% if period == 'today' %}active{% endif %}">Today</button>
                 <button type="button" onclick="setPeriod('week')"  class="{% if period == 'week' %}active{% endif %}">Week</button>
                 <button type="button" onclick="setPeriod('month')" class="{% if period == 'month' or not period %}active{% endif %}">Month</button>
-                <button type="button" onclick="setPeriod('all')"   class="{% if period == 'all' %}active{% endif %}">All time</button>
+                <button type="button" onclick="setPeriod('all')"   class="{% if period == 'all' %}active{% endif %}">All</button>
                 <button type="button" onclick="setPeriod('custom')" class="{% if period == 'custom' %}active{% endif %}">Custom</button>
             </div>
             <input type="hidden" name="period" id="period-input" value="{{ period|default:'month' }}">
@@ -181,6 +202,23 @@
             </div>
         </div>
     </div>
+
+    {% if draft_count %}
+    <a href="{% url 'invoice_list' %}?status=draft" style="text-decoration:none;display:block;margin-bottom:24px;">
+        <div style="background:#ffecec;border:0.5px solid #ffb3b3;border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;">
+            <div style="width:42px;height:42px;border-radius:10px;background:#ff4444;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="bi bi-file-earmark-x-fill" style="color:white;font-size:22px;"></i>
+            </div>
+            <div style="flex:1;">
+                <div style="font-size:15px;font-weight:600;color:#cc3333;">{{ draft_count }} незаконченн{{ draft_count|pluralize:"ый,ых" }} инвойс{{ draft_count|pluralize:",,ов" }}</div>
+                <div style="font-size:13px;color:#a03030;margin-top:2px;">
+                    {% for inv in draft_invoices|slice:":5" %}{{ inv.customer.name }}{% if not forloop.last %} · {% endif %}{% endfor %}
+                </div>
+            </div>
+            <i class="bi bi-chevron-right" style="color:#cc3333;font-size:18px;"></i>
+        </div>
+    </a>
+    {% endif %}
 
     <!-- Stat cards -->
     <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:24px;">

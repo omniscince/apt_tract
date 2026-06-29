@@ -70,10 +70,20 @@ TEMPLATES = [
 WSGI_APPLICATION = 'apt_tract.wsgi.application'
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': (
+        {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('PG_DB'),
+            'USER': os.getenv('PG_USER'),
+            'PASSWORD': os.getenv('PG_PASSWORD'),
+            'HOST': os.getenv('PG_HOST', '127.0.0.1'),
+            'PORT': os.getenv('PG_PORT', '5432'),
+        } if os.getenv('USE_POSTGRES', 'False') == 'True' else
+        {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    )
 }
 
 AUTH_USER_MODEL = 'users.User'
@@ -117,21 +127,47 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
 
-# HST Rate - 13% for apttract.com
-from decimal import Decimal
-HST_RATE = Decimal('0.13')
+
 
 # Email settings
-
-
-from decimal import Decimal
-HST_RATE = Decimal('0.00')
-
-
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.sendgrid.net'
+EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'apikey'
-EMAIL_HOST_PASSWORD = os.getenv('SENDGRID_API_KEY', '')
+EMAIL_HOST_USER = 'autoprotinting@gmail.com'
+EMAIL_HOST_PASSWORD = 'hwpukuxycladwumu'
 DEFAULT_FROM_EMAIL = 'autoprotinting@gmail.com'
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{asctime}] {levelname} {message}',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+    },
+    'handlers': {
+        'invoice_file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'logs/invoice_actions.log',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'invoices': {
+            'handlers': ['invoice_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
+
+# --- Session: "Remember me" 30 days ---
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 30          # 30 дней
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True           # по умолчанию до закрытия браузера (галка переопределит)
+SESSION_SAVE_EVERY_REQUEST = True                # отсчёт 30 дней от последней активности
+SESSION_COOKIE_HTTPONLY = True                   # кука недоступна JS
+SESSION_COOKIE_SECURE = True                     # только по HTTPS
+SESSION_COOKIE_SAMESITE = 'Lax'

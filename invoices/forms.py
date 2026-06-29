@@ -114,6 +114,12 @@ class InvoiceForm(forms.ModelForm):
             elif self.instance.car_info:
                 self.initial['car_make'] = self.instance.car_info
 
+    def clean_car_make(self):
+        make = self.cleaned_data.get('car_make', '').strip()
+        if not make:
+            raise forms.ValidationError('Car Make is required.')
+        return make.upper()
+
     def clean_car_vin(self):
         vin = self.cleaned_data.get('car_vin', '').strip()
         if vin and len(vin) < 8:

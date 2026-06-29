@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
-{% block title %}{{ title }} - AutoPro{% endblock %}
+{% block title %}{{ title }} - AutoPro
+{% endblock %}
 {% block page_title %}{{ title }}{% endblock %}
 {% block back_link %}<a href="#" onclick="history.back();return false;" class="hdr-back"><i class="bi bi-chevron-left"></i> Back</a>{% endblock %}
 {% block content %}
@@ -406,5 +407,171 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     observer.observe(document.body, { childList: true, subtree: true });
 });
+</script>
+<script>
+    window.DRAFT_KEY = 'apt_invoice_draft_{{ request.user.pk }}';
+    var DRAFT_KEY = window.DRAFT_KEY;
+    var isEdit = {{ invoice.pk|default:'null' }} !== null;
+
+    function collectDraft() {
+        var data = {};
+        ['id_customer_name','id_car_vin','id_car_make','id_car_model','id_car_stock',
+         'id_invoice_date','id_due_date','id_po_number','id_notes'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) data[id] = el.value;
+        });
+        var services = [];
+        document.querySelectorAll('.formset-row').forEach(function(row) {
+            var desc = row.querySelector('[name$="-description"]');
+            var price = row.querySelector('[name$="-price"]');
+            var del = row.querySelector('[name$="-DELETE"]');
+            if (desc && price && !(del && del.checked)) {
+                services.push({desc: desc.value, price: price.value});
+            }
+        });
+        data['_services'] = services;
+        data['_ts'] = new Date().toISOString();
+        return data;
+    }
+
+    function restoreDraft(data) {
+        ['id_customer_name','id_car_vin','id_car_make','id_car_model','id_car_stock',
+         'id_invoice_date','id_due_date','id_po_number','id_notes'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el && data[id]) el.value = data[id];
+        });
+        if (data['id_customer_name']) {
+            window._customerFound = true;
+            var ci = document.getElementById('id_customer_name');
+            if (ci) ci.style.borderColor = 'var(--success)';
+        }
+        if (data['_services'] && data['_services'].length) {
+            var container = document.getElementById('formset-container');
+            var totalForms = document.getElementById('id_items-TOTAL_FORMS');
+            if (container && totalForms) {
+                container.innerHTML = '';
+                totalForms.value = 0;
+                data['_services'].forEach(function(s, i) {
+                    var row = document.createElement('div');
+                    row.className = 'formset-row';
+                    row.style = 'display:flex;align-items:center;gap:10px;margin-bottom:10px;background:#f8f9fa;border-radius:10px;padding:10px 12px;';
+                    row.innerHTML =
+                        '<div style="flex:1;"><input type="text" name="items-'+i+'-description" class="form-control" placeholder="SERVICE DESCRIPTION" autocomplete="off" value="'+s.desc+'"><input type="hidden" name="items-'+i+'-id" value=""></div>' +
+                        '<div style="width:110px;"><input type="number" name="items-'+i+'-price" class="form-control" placeholder="0.00" step="0.01" value="'+s.price+'"></div>' +
+                        '<button type="button" onclick="deleteRow(this)" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--danger);font-size:18px;flex-shrink:0;"><i class="bi bi-trash"></i></button>' +
+                        '<div style="display:none;"><input type="checkbox" name="items-'+i+'-DELETE"></div>';
+                    container.appendChild(row);
+                    totalForms.value = i + 1;
+                });
+            }
+        }
+    }
+
+    function showDraftBanner(data) {
+        var ts = data['_ts'] ? new Date(data['_ts']).toLocaleString('ru-RU', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+        var customer = data['id_customer_name'] || 'без имени';
+        var banner = document.createElement('div');
+        banner.id = 'draft-banner';
+        banner.style = 'background:#fff3cd;border-left:4px solid #e6a817;border-radius:8px;padding:12px 14px;margin-bottom:16px;display:flex;align-items:center;gap:10px;';
+        banner.innerHTML =
+            '<i class="bi bi-exclamation-triangle-fill" style="color:#e6a817;font-size:18px;flex-shrink:0;"></i>' +
+            '<div style="flex:1;"><div style="font-size:13px;font-weight:600;color:#7a5200;">Незаконченный инвойс</div>' +
+            '<div style="font-size:12px;color:#a06800;">Сохранён '+ts+' — '+customer+'</div></div>' +
+            '<button type="button" id="draft-restore-btn" style="background:#e6a817;color:white;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;margin-right:6px;">Продолжить</button>' +
+            '<button type="button" id="draft-discard-btn" style="background:none;border:0.5px solid #e6a817;color:#a06800;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;">Удалить</button>';
+        var card = document.querySelector('.card.p-4');
+        if (card) card.insertBefore(banner, card.firstChild);
+        document.getElementById('draft-restore-btn').addEventListener('click', function() {
+            restoreDraft(data);
+            banner.remove();
+        });
+        document.getElementById('draft-discard-btn').addEventListener('click', function() {
+            localStorage.removeItem(DRAFT_KEY);
+            banner.remove();
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/invoices/delete-draft/', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            var csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+            if (csrf) xhr.setRequestHeader('X-CSRFToken', csrf.value);
+            xhr.send('{}');
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        if (isEdit) { localStorage.removeItem(DRAFT_KEY); return; }
+
+        var saved = null;
+        try { saved = JSON.parse(localStorage.getItem(DRAFT_KEY)); } catch(e) {}
+        if (saved && saved['id_customer_name']) showDraftBanner(saved);
+
+        setInterval(function() {
+            if (isEdit) return;
+            var data = collectDraft();
+            if (data['id_customer_name'] || data['id_car_make']) {
+                localStorage.setItem(DRAFT_KEY, JSON.stringify(data));
+            }
+        }, 30000);
+
+        var form = document.getElementById('invoice-form');
+        if (form) {
+            form.addEventListener('submit', function() {
+                localStorage.removeItem(DRAFT_KEY);
+            });
+        }
+
+        window.saveDraftToServer = function saveDraftToServer(callback) {
+            if (isEdit) { if (callback) callback(); return; }
+            var data = collectDraft();
+            if (!data['id_customer_name'] && !data['id_car_make']) { if (callback) callback(); return; }
+            localStorage.setItem(DRAFT_KEY, JSON.stringify(data));
+            var payload = JSON.stringify({
+                customer_name: data['id_customer_name'] || '',
+                car_make: data['id_car_make'] || '',
+                car_vin: data['id_car_vin'] || '',
+                car_model: data['id_car_model'] || '',
+                car_stock: data['id_car_stock'] || '',
+                invoice_date: data['id_invoice_date'] || '',
+                po_number: data['id_po_number'] || '',
+                notes: data['id_notes'] || '',
+                services: data['_services'] || []
+            });
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/invoices/save-draft/', false);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.setRequestHeader('X-CSRFToken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+            try { xhr.send(payload); } catch(e) {}
+            if (callback) callback();
+        }
+
+        window.saveDraftToServer = saveDraftToServer;
+        document.querySelectorAll('a[href]').forEach(function(link) {
+            link.addEventListener('click', function(e) {
+                var href = this.getAttribute('href');
+                if (!href || href.startsWith('#') || href.startsWith('javascript')) return;
+                e.preventDefault();
+                var target = href;
+                saveDraftToServer(function() { window.location.href = target; });
+            });
+        });
+
+        window.addEventListener('beforeunload', function() {
+            if (isEdit) return;
+            var data = collectDraft();
+            if (!data['id_customer_name'] && !data['id_car_make']) return;
+            localStorage.setItem(DRAFT_KEY, JSON.stringify(data));
+            var payload = JSON.stringify({
+                customer_name: data['id_customer_name'] || '',
+                car_make: data['id_car_make'] || '',
+                car_vin: data['id_car_vin'] || '',
+                car_model: data['id_car_model'] || '',
+                car_stock: data['id_car_stock'] || '',
+                invoice_date: data['id_invoice_date'] || '',
+                po_number: data['id_po_number'] || '',
+                notes: data['id_notes'] || '',
+                services: data['_services'] || []
+            });
+            navigator.sendBeacon('/invoices/save-draft/', new Blob([payload], {type:'application/json'}));
+        });
+    });
 </script>
 {% endblock %}

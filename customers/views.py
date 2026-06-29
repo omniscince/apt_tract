@@ -12,12 +12,21 @@ import json
 @method_decorator(login_required, name='dispatch')
 class CustomerListView(View):
     def get(self, request):
-        customers = Customer.objects.all()
         q = request.GET.get('q', '')
+        customers = Customer.objects.prefetch_related('cars').all()
         if q:
-            customers = customers.filter(name__icontains=q) | customers.filter(company__icontains=q)
+            from cars.models import Car
+            car_customer_ids = Car.objects.filter(make__icontains=q).values_list('customer_id', flat=True)
+            customers = customers.filter(name__icontains=q) | customers.filter(company__icontains=q) | customers.filter(id__in=car_customer_ids)
+            customers = customers.distinct()
+        from django.core.paginator import Paginator
+        paginator = Paginator(customers, 25)
+        page_number = request.GET.get('page', 1)
+        page_obj = paginator.get_page(page_number)
+
         return render(request, 'customers/customer_list.html', {
-            'customers': customers,
+            'customers': page_obj,
+            'page_obj': page_obj,
             'q': q,
         })
 

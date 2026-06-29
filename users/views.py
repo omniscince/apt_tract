@@ -23,6 +23,10 @@ class LoginView(View):
             user = authenticate(request, username=email, password=password)
             if user:
                 login(request, user)
+                if request.POST.get('remember_me'):
+                    request.session.set_expiry(60 * 60 * 24 * 30)  # 30 дней
+                else:
+                    request.session.set_expiry(0)                  # до закрытия браузера
                 return redirect('dashboard')
             else:
                 messages.error(request, 'Invalid email or password')

@@ -12,21 +12,23 @@
 <!-- MOBILE -->
 <div id="mobile-view">
     <div id="cust-search-bar" style="display:none;background:#fff;padding:10px 16px;border-bottom:1px solid var(--border);">
-        <div style="background:var(--bg);border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
+        <form method="get" id="mobile-search-form" style="background:var(--bg);border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
             <i class="bi bi-search" style="color:var(--muted);font-size:16px;"></i>
-            <input type="text" id="cust-search-input" placeholder="Search customers..."
+            <input type="text" name="q" id="cust-search-input" placeholder="Search customers..."
                    style="border:none;background:transparent;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;width:100%;"
-                   oninput="filterCustomers(this.value)">
-            <button onclick="closeCustSearch()" style="background:none;border:none;cursor:pointer;padding:0;">
+                   value="{{ q }}"
+                   oninput="scheduleSearch()">
+            <button type="button" onclick="closeCustSearch()" style="background:none;border:none;cursor:pointer;padding:0;">
                 <i class="bi bi-x" style="color:var(--muted);font-size:18px;"></i>
             </button>
-        </div>
+        </form>
     </div>
 
     <div class="ap-card" style="border-radius:0;border-left:none;border-right:none;border-top:none;">
         {% for c in customers %}
         <a href="{% url 'customer_detail' c.pk %}" class="ap-list-item cust-item"
-           data-name="{{ c.name|lower }}">
+           data-name="{{ c.name|lower }}"
+           data-cars="{% for car in c.cars.all %}{{ car.make|lower }} {% endfor %}">
             <div class="ap-list-icon"><i class="bi bi-person-fill"></i></div>
             <div class="ap-list-content">
                 <div class="ap-list-title">{{ c.name }}</div>
@@ -44,6 +46,17 @@
         </div>
         {% endfor %}
     </div>
+    {% if page_obj.has_other_pages %}
+    <div style="display:flex;justify-content:center;align-items:center;gap:8px;padding:12px 16px;background:#fff;border-top:1px solid var(--border);">
+        {% if page_obj.has_previous %}
+        <a href="?{% if q %}q={{ q }}&{% endif %}page={{ page_obj.previous_page_number }}" class="ap-btn ap-btn-outline ap-btn-sm">← Prev</a>
+        {% endif %}
+        <span style="font-size:12px;color:var(--muted);">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <a href="?{% if q %}q={{ q }}&{% endif %}page={{ page_obj.next_page_number }}" class="ap-btn ap-btn-outline ap-btn-sm">Next →</a>
+        {% endif %}
+    </div>
+    {% endif %}
 </div>
 
 <!-- DESKTOP -->
@@ -95,6 +108,18 @@
             </tbody>
         </table>
     </div>
+
+    {% if page_obj.has_other_pages %}
+    <div style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:20px;flex-wrap:wrap;">
+        {% if page_obj.has_previous %}
+        <a href="?{% if q %}q={{ q }}&{% endif %}page={{ page_obj.previous_page_number }}" class="ap-btn ap-btn-outline ap-btn-sm">← Prev</a>
+        {% endif %}
+        <span style="font-size:13px;color:var(--muted);">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} ({{ page_obj.paginator.count }} total)</span>
+        {% if page_obj.has_next %}
+        <a href="?{% if q %}q={{ q }}&{% endif %}page={{ page_obj.next_page_number }}" class="ap-btn ap-btn-outline ap-btn-sm">Next →</a>
+        {% endif %}
+    </div>
+    {% endif %}
 </div>
 
 {% if user.role in 'owner,staff,accountant' %}
@@ -112,23 +137,29 @@
 </style>
 <script>
 var custSearchOpen = false;
+var searchTimer = null;
 document.addEventListener('DOMContentLoaded', function() {
     if (window.innerWidth >= 768) return;
     var hdrRight = document.querySelector('.app-header .hdr-side:last-child');
     if (!hdrRight) return;
     hdrRight.innerHTML = '<button onclick="toggleCustSearch()" style="background:none;border:none;cursor:pointer;padding:4px;"><i class="bi bi-search" style="color:#fff;font-size:20px;"></i></button>';
+    if ('{{ q }}') { 
+        var bar = document.getElementById('cust-search-bar');
+        bar.style.display = 'block';
+        custSearchOpen = true;
+    }
 });
 function toggleCustSearch() {
     var bar = document.getElementById('cust-search-bar');
-    if (custSearchOpen) { bar.style.display='none'; document.getElementById('cust-search-input').value=''; filterCustomers(''); custSearchOpen=false; }
+    if (custSearchOpen) { bar.style.display='none'; custSearchOpen=false; window.location.href='{% url "customer_list" %}'; }
     else { bar.style.display='block'; document.getElementById('cust-search-input').focus(); custSearchOpen=true; }
 }
-function closeCustSearch() { document.getElementById('cust-search-bar').style.display='none'; document.getElementById('cust-search-input').value=''; filterCustomers(''); custSearchOpen=false; }
-function filterCustomers(q) {
-    q = q.toLowerCase();
-    document.querySelectorAll('.cust-item').forEach(function(item) {
-        item.style.display = item.getAttribute('data-name').includes(q) ? '' : 'none';
-    });
+function closeCustSearch() { document.getElementById('cust-search-bar').style.display='none'; custSearchOpen=false; window.location.href='{% url "customer_list" %}'; }
+function scheduleSearch() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function() {
+        document.getElementById('mobile-search-form').submit();
+    }, 500);
 }
 </script>
 <script>

@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block content %}
+<div style="padding:16px;max-width:600px;margin:0 auto;">
+    <p style="font-size:20px;font-weight:700;margin:0 0 2px;">Reports</p>
+    <p style="font-size:13px;color:var(--muted);margin:0 0 18px;">Выберите отчёт</p>
+
+    <a href="{% url 'monthly_report' %}" class="report-card">
+        <div class="report-ico" style="background:#e6f1fb;color:#185fa5;"><i class="bi bi-calendar3"></i></div>
+        <div class="report-txt"><div class="report-title">Monthly Report</div><div class="report-sub">Выручка и инвойсы за месяц</div></div>
+        <i class="bi bi-chevron-right report-arr"></i>
+    </a>
+
+    {% if user.role == 'owner' %}
+    <a href="{% url 'crew_report' %}" class="report-card">
+        <div class="report-ico" style="background:#e1f5ee;color:#0f6e56;"><i class="bi bi-people"></i></div>
+        <div class="report-txt"><div class="report-title">Crew Report</div><div class="report-sub">Заработок по сотрудникам</div></div>
+        <i class="bi bi-chevron-right report-arr"></i>
+    </a>
+
+    <a href="{% url 'customer_report' %}" class="report-card">
+        <div class="report-ico" style="background:#faece7;color:#993c1d;"><i class="bi bi-person-vcard"></i></div>
+        <div class="report-txt"><div class="report-title">Customer Report</div><div class="report-sub">Разбивка по клиентам</div></div>
+        <i class="bi bi-chevron-right report-arr"></i>
+    </a>
+    {% endif %}
+</div>
+<style>
+.report-card{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px;text-decoration:none;color:var(--text);transition:border-color .15s;}
+.report-card:hover{border-color:var(--brand);}
+.report-ico{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;}
+.report-txt{flex:1;min-width:0;}
+.report-title{font-size:15px;font-weight:700;}
+.report-sub{font-size:12px;color:var(--muted);}
+.report-arr{color:var(--muted);font-size:18px;}
+</style>
+{% endblock %}

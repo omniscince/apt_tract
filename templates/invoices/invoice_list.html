@@ -12,16 +12,22 @@
 <!-- MOBILE -->
 <div id="mobile-view">
 
-    <div id="search-bar" style="display:none;background:#fff;padding:10px 16px;border-bottom:1px solid var(--border);">
-        <div style="background:var(--bg);border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
-            <i class="bi bi-search" style="color:var(--muted);font-size:16px;"></i>
-            <input type="text" id="search-input" placeholder="Search invoice # or customer..."
-                   style="border:none;background:transparent;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;width:100%;"
-                   oninput="filterInvoices(this.value)">
-            <button onclick="closeSearch()" style="background:none;border:none;cursor:pointer;padding:0;">
-                <i class="bi bi-x" style="color:var(--muted);font-size:18px;"></i>
-            </button>
-        </div>
+    <div id="search-bar" style="display:{% if request.GET.q %}block{% else %}none{% endif %};background:#fff;padding:10px 16px;border-bottom:1px solid var(--border);">
+        <form method="get" action="{% url 'invoice_list' %}">
+            {% if request.GET.status %}<input type="hidden" name="status" value="{{ request.GET.status }}">{% endif %}
+            {% if request.GET.sent %}<input type="hidden" name="sent" value="{{ request.GET.sent }}">{% endif %}
+            <div style="background:var(--bg);border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
+                <button type="submit" style="background:none;border:none;cursor:pointer;padding:0;display:flex;">
+                    <i class="bi bi-search" style="color:var(--muted);font-size:16px;"></i>
+                </button>
+                <input type="text" name="q" id="search-input" placeholder="Search invoice #, customer or stock..."
+                       value="{{ request.GET.q }}"
+                       style="border:none;background:transparent;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;width:100%;">
+                <a href="{% url 'invoice_list' %}" style="display:flex;padding:0;">
+                    <i class="bi bi-x" style="color:var(--muted);font-size:18px;"></i>
+                </a>
+            </div>
+        </form>
     </div>
 
     <div style="background:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);">
@@ -41,18 +47,36 @@
         {% for inv in invoices %}
         <a href="{% url 'invoice_detail' inv.pk %}" class="ap-list-item invoice-item"
            data-number="{{ inv.invoice_number|lower }}"
-           data-customer="{{ inv.get_customer_display|lower }}">
+           data-customer="{{ inv.get_customer_display|lower }}"
+           data-stock="{{ inv.car.stock_number|lower }}"
+           data-car="{{ inv.get_car_display|lower }}"
+           style="{% if inv.status == 'draft' %}background:#fff8f8;border-left:3px solid #ff4444;{% endif %}">
             <div class="ap-list-icon">
+                {% if inv.status == 'draft' %}
+                <i class="bi bi-file-earmark-x-fill" style="color:#cc3333;"></i>
+                {% else %}
                 <i class="bi bi-{% if inv.email_sent %}envelope-check-fill{% else %}envelope{% endif %}"
                    style="color:{% if inv.email_sent %}var(--success){% else %}var(--muted){% endif %};"></i>
+                {% endif %}
             </div>
             <div class="ap-list-content">
-                <div class="ap-list-title">{{ inv.invoice_number }} <small style="color:var(--muted);font-weight:400;">{{ inv.get_customer_display }}</small></div>
+                <div class="ap-list-title">
+                    {% if inv.status == 'draft' %}
+                    <span style="color:#cc3333;font-weight:600;">DRAFT</span>
+                    {% else %}
+                    {{ inv.invoice_number }}
+                    {% endif %}
+                    <small style="color:var(--muted);font-weight:400;">{{ inv.get_customer_display }}</small>
+                </div>
                 <div class="ap-list-sub">{{ inv.get_car_display|truncatechars:30 }}</div>
             </div>
             <div class="ap-list-right">
+                {% if inv.status == 'draft' %}
+                <span style="background:#ffecec;color:#cc3333;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;border:0.5px solid #ffb3b3;">Незакончен</span>
+                {% else %}
                 <div class="ap-list-amount">${{ inv.total }}</div>
                 <div style="font-size:11px;color:var(--muted);">{{ inv.invoice_date|date:"M d" }}</div>
+                {% endif %}
             </div>
         </a>
         {% empty %}
@@ -62,6 +86,17 @@
         </div>
         {% endfor %}
     </div>
+    {% if page_obj.has_other_pages %}
+    <div style="display:flex;justify-content:center;align-items:center;gap:8px;padding:12px 16px;background:#fff;border-top:1px solid var(--border);">
+        {% if page_obj.has_previous %}
+        <a href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}" class="ap-btn ap-btn-outline ap-btn-sm">← Prev</a>
+        {% endif %}
+        <span style="font-size:12px;color:var(--muted);">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <a href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ page_obj.next_page_number }}" class="ap-btn ap-btn-outline ap-btn-sm">Next →</a>
+        {% endif %}
+    </div>
+    {% endif %}
 </div>
 
 <!-- DESKTOP -->
@@ -89,6 +124,10 @@
             </div>
             {% endif %}
             <div class="col-md-1">
+                <label class="form-label">Stock #</label>
+                <input type="text" name="stock" class="form-control" placeholder="Stock #" value="{{ request.GET.stock }}">
+            </div>
+            <div class="col-md-1">
                 <label class="form-label">Month</label>
                 <input type="number" name="month" class="form-control" placeholder="1-12" value="{{ request.GET.month }}" min="1" max="12">
             </div>
@@ -113,6 +152,7 @@
         </form>
     </div>
     <div class="ap-card">
+        <div class="ap-table-wrap">
         <table class="ap-table">
             <thead>
                 <tr>
@@ -133,7 +173,8 @@
                     <td>{{ inv.work_completed_by.get_full_name|default:'-' }}</td>
                     <td>{% if inv.email_sent %}<span style="color:var(--success);">✓</span>{% else %}<span style="color:var(--muted);">–</span>{% endif %}</td>
                     <td><span class="ap-badge badge-{{ inv.status }}">{{ inv.status|upper }}</span></td>
-                    <td style="display:flex;gap:6px;">
+                    <td>
+                      <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;flex-wrap:nowrap;">
                         <a href="{% url 'invoice_detail' inv.pk %}" class="ap-btn ap-btn-outline ap-btn-sm">View</a>
                         {% if user.role in 'owner,staff' %}
                         <a href="{% url 'invoice_edit' inv.pk %}" class="ap-btn ap-btn-outline ap-btn-sm"><i class="bi bi-pencil"></i></a>
@@ -144,6 +185,7 @@
                             <button class="ap-btn ap-btn-danger ap-btn-sm"><i class="bi bi-trash"></i></button>
                         </form>
                         {% endif %}
+                      </div>
                     </td>
                 </tr>
                 {% empty %}
@@ -151,7 +193,21 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
     </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:20px;flex-wrap:wrap;">
+        {% if page_obj.has_previous %}
+        <a href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}" class="ap-btn ap-btn-outline ap-btn-sm">← Prev</a>
+        {% endif %}
+        <span style="font-size:13px;color:var(--muted);">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} ({{ page_obj.paginator.count }} total)</span>
+        {% if page_obj.has_next %}
+        <a href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ page_obj.next_page_number }}" class="ap-btn ap-btn-outline ap-btn-sm">Next →</a>
+        {% endif %}
+    </div>
+    {% endif %}
 </div>
 
 {% if user.role in 'owner,staff' %}
@@ -234,6 +290,10 @@
             <label class="ap-label">VIN</label>
             <input type="text" name="vin" class="form-control" placeholder="Search by VIN..." value="{{ request.GET.vin }}">
         </div>
+        <div class="form-group">
+            <label class="ap-label">Stock #</label>
+            <input type="text" name="stock" class="form-control" placeholder="Search by Stock #..." value="{{ request.GET.stock }}">
+        </div>
 
         <div class="form-group">
             <label class="ap-label">Status</label>
@@ -258,6 +318,17 @@
 
 {% block scripts %}
 <style>
+.ap-table td{vertical-align:middle;}
+.ap-table-wrap{width:100%;overflow-x:auto;}
+.ap-card{min-width:0;max-width:100%;overflow:hidden;}
+
+.ap-table th:last-child, .ap-table td:last-child{width:1%;white-space:nowrap;text-align:right;}
+.ap-table td:last-child > div{display:inline-flex;gap:6px;align-items:center;justify-content:flex-end;}
+.ap-table .ap-btn-sm{min-width:34px;height:32px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;}
+.ap-table .ap-btn-sm i{display:inline-block;width:16px;text-align:center;line-height:1;}
+
+
+
 .status-btn { border:1.5px solid var(--border);background:var(--bg);color:var(--text);border-radius:20px;padding:5px 14px;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s; }
 .status-btn-active { background:var(--brand);color:#fff;border-color:var(--brand); }
 .desktop-hide { display: none !important; }
@@ -302,7 +373,9 @@ function filterInvoices(q) {
     document.querySelectorAll('.invoice-item').forEach(function(item) {
         var num = item.getAttribute('data-number')||'';
         var cust = item.getAttribute('data-customer')||'';
-        item.style.display = (num.includes(q)||cust.includes(q)) ? '' : 'none';
+        var stock = item.getAttribute('data-stock')||'';
+        var car = item.getAttribute('data-car')||'';
+        item.style.display = (num.includes(q)||cust.includes(q)||stock.includes(q)||car.includes(q)) ? '' : 'none';
     });
 }
 var currentSent = '{{ request.GET.sent|default:"" }}';
