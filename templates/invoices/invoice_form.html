@@ -513,8 +513,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 30000);
 
         var form = document.getElementById('invoice-form');
+        var formSubmitted = false;
         if (form) {
             form.addEventListener('submit', function() {
+                formSubmitted = true;
                 localStorage.removeItem(DRAFT_KEY);
             });
         }
@@ -544,18 +546,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         window.saveDraftToServer = saveDraftToServer;
-        document.querySelectorAll('a[href]').forEach(function(link) {
-            link.addEventListener('click', function(e) {
-                var href = this.getAttribute('href');
-                if (!href || href.startsWith('#') || href.startsWith('javascript')) return;
-                e.preventDefault();
-                var target = href;
-                saveDraftToServer(function() { window.location.href = target; });
-            });
-        });
+        // NOTE: перехват кликов по ссылкам для автосохранения черновика убран —
+        // он создавал реальный Invoice(status=draft) в БД на КАЖДЫЙ клик по ссылке,
+        // и эти черновики не удалялись после успешного создания финального инвойса,
+        // что приводило к дублям инвойсов. Черновик теперь сохраняется только
+        // в localStorage (см. setInterval и beforeunload ниже), без похода на сервер.
 
         window.addEventListener('beforeunload', function() {
             if (isEdit) return;
+            if (formSubmitted) return;
             var data = collectDraft();
             if (!data['id_customer_name'] && !data['id_car_make']) return;
             localStorage.setItem(DRAFT_KEY, JSON.stringify(data));

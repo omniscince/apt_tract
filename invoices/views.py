@@ -170,13 +170,6 @@ class InvoiceListView(View):
     def get(self, request):
         from datetime import date, timedelta
         user = request.user
-        if user.role == 'staff':
-            invoices = Invoice.objects.filter(
-                models.Q(created_by=user) | models.Q(work_completed_by=user)
-            ).distinct().select_related('customer', 'car', 'created_by', 'work_completed_by')
-        else:
-            invoices = Invoice.objects.all().select_related('customer', 'car', 'created_by', 'work_completed_by')
-
         q           = request.GET.get('q', '')
         customer_id = request.GET.get('customer')
         staff_id    = request.GET.get('staff')
@@ -184,6 +177,15 @@ class InvoiceListView(View):
         year        = request.GET.get('year')
         vin         = request.GET.get('vin')
         stock       = request.GET.get('stock', '')
+        # Поиск по стоку/VIN — общая функция, ищет по всей базе даже для staff,
+        # т.к. номер машины не привязан к конкретному сотруднику.
+        searching_by_vehicle = bool(stock) or bool(vin)
+        if user.role == 'staff' and not searching_by_vehicle:
+            invoices = Invoice.objects.filter(
+                models.Q(created_by=user) | models.Q(work_completed_by=user)
+            ).distinct().select_related('customer', 'car', 'created_by', 'work_completed_by')
+        else:
+            invoices = Invoice.objects.all().select_related('customer', 'car', 'created_by', 'work_completed_by')
         status      = request.GET.get('status')
         sent        = request.GET.get('sent', '')
         period      = request.GET.get('period', '')
@@ -288,6 +290,7 @@ class InvoiceCreateView(View):
             invoice.save()
             formset.instance = invoice
             formset.save()
+            Invoice.objects.filter(created_by=request.user, status='draft').exclude(pk=invoice.pk).delete()
             logger.info(f'CREATED invoice={invoice.invoice_number} customer="{invoice.get_customer_display()}" total={invoice.total} user={request.user.email} status={invoice.status}')
             messages.success(request, f'Invoice #{invoice.invoice_number} created!')
             return redirect('invoice_detail', pk=invoice.pk)
@@ -473,7 +476,7 @@ class CustomerSearchView(View):
 @method_decorator(login_required, name='dispatch')
 class MonthlyReportView(View):
     def get(self, request):
-        invoices = Invoice.objects.all().select_related('customer', 'car', 'created_by')
+        invoices = Invoice.objects.exclude(status__in=['cancelled', 'draft']).select_related('customer', 'car', 'created_by')
 
         customer_id = request.GET.get('customer')
         staff_id = request.GET.get('staff')
@@ -508,23 +511,51 @@ class MonthlyReportView(View):
             invoices = invoices.filter(car__stock_number__icontains=stock)
 
         from users.models import User
+        from django.core.paginator import Paginator
+        from datetime import date as _mindate
         customers = Customer.objects.all()
         staff_list = User.objects.all()
 
+        sort = request.GET.get('sort', 'date_desc')
+        invoices_list = list(invoices.prefetch_related('items'))
+        grand_total = sum(inv.total for inv in invoices_list)
+
+        if sort == 'date_asc':
+            invoices_list.sort(key=lambda i: i.invoice_date or _mindate.min)
+        elif sort == 'total_desc':
+            invoices_list.sort(key=lambda i: i.total, reverse=True)
+        elif sort == 'total_asc':
+            invoices_list.sort(key=lambda i: i.total)
+        elif sort == 'customer':
+            invoices_list.sort(key=lambda i: (i.get_customer_display() or '').upper())
+        elif sort == 'number':
+            invoices_list.sort(key=lambda i: i.invoice_number or '')
+        else:
+            invoices_list.sort(key=lambda i: i.invoice_date or _mindate.min, reverse=True)
+
+        paginator = Paginator(invoices_list, 25)
+        page_obj = paginator.get_page(request.GET.get('page'))
+
+        qs = request.GET.copy()
+        qs.pop('page', None)
+
         return render(request, 'invoices/monthly_report.html', {
-            'invoices': invoices,
+            'invoices': page_obj,
+            'page_obj': page_obj,
             'customers': customers,
             'staff_list': staff_list,
-            'total': sum(inv.total for inv in invoices),
+            'total': grand_total,
             'month': month,
             'year': year,
+            'sort': sort,
+            'querystring': qs.urlencode(),
         })
 
 
 @method_decorator(login_required, name='dispatch')
 class MonthlyReportPDFView(View):
     def get(self, request):
-        invoices = Invoice.objects.all().select_related('customer', 'car', 'created_by')
+        invoices = Invoice.objects.exclude(status__in=['cancelled', 'draft']).select_related('customer', 'car', 'created_by')
 
         customer_id = request.GET.get('customer')
         staff_id = request.GET.get('staff')
@@ -578,7 +609,7 @@ class SendStatementView(View):
             messages.error(request, 'No email address found for this customer')
             return redirect('monthly_report')
 
-        invoices = Invoice.objects.filter(customer=customer)
+        invoices = Invoice.objects.filter(customer=customer).exclude(status__in=['cancelled', 'draft'])
         month = request.POST.get('month')
         year = request.POST.get('year')
         if month:
@@ -619,7 +650,7 @@ class StatementPreviewView(View):
         customer_id = request.GET.get('customer')
         from customers.models import Customer as C
         customer = C.objects.filter(pk=customer_id).first() if customer_id else None
-        invoices = Invoice.objects.filter(customer=customer) if customer else Invoice.objects.all()[:5]
+        invoices = Invoice.objects.filter(customer=customer).exclude(status__in=['cancelled', 'draft']) if customer else Invoice.objects.exclude(status__in=['cancelled', 'draft'])[:5]
         response = HttpResponse(content_type='application/pdf')
         response['Content-Disposition'] = 'inline; filename="preview.pdf"'
         generate_monthly_report_pdf(response, invoices, customer=customer)
@@ -742,12 +773,28 @@ class CrewReportView(View):
 
         start = request.GET.get('start')
         end = request.GET.get('end')
+        month = request.GET.get('month')
+        year = request.GET.get('year')
+        # если выбран месяц без года — дефолт на текущий год
+        if month and not year:
+            from datetime import date as _date
+            year = str(_date.today().year)
 
         invoices = Invoice.objects.filter(status='final').select_related('work_completed_by')
         if start:
             invoices = invoices.filter(invoice_date__gte=parse_date(start))
         if end:
             invoices = invoices.filter(invoice_date__lte=parse_date(end))
+        if month:
+            try:
+                invoices = invoices.filter(invoice_date__month=int(month))
+            except (ValueError, TypeError):
+                pass
+        if year:
+            try:
+                invoices = invoices.filter(invoice_date__year=int(year))
+            except (ValueError, TypeError):
+                pass
 
         staff_users = User.objects.filter(role='staff')
         rows = []
@@ -765,6 +812,8 @@ class CrewReportView(View):
             'total_gross': sum(r['gross'] for r in rows),
             'start': start or '',
             'end': end or '',
+            'month': month or '',
+            'year': year or '',
         })
 
 
@@ -774,16 +823,30 @@ class CustomerReportView(View):
         if request.user.role != 'owner':
             return redirect('dashboard')
         from django.utils.dateparse import parse_date
-
+        from django.core.paginator import Paginator
+        from datetime import date as _date
         start = request.GET.get('start')
         end = request.GET.get('end')
-
-        invoices = Invoice.objects.all().select_related('customer')
+        month = request.GET.get('month')
+        year = request.GET.get('year')
+        sort = request.GET.get('sort', 'gross_desc')
+        if month and not year:
+            year = str(_date.today().year)
+        invoices = Invoice.objects.exclude(status__in=['cancelled', 'draft']).select_related('customer').prefetch_related('items')
         if start:
             invoices = invoices.filter(invoice_date__gte=parse_date(start))
         if end:
             invoices = invoices.filter(invoice_date__lte=parse_date(end))
-
+        if month:
+            try:
+                invoices = invoices.filter(invoice_date__month=int(month))
+            except (ValueError, TypeError):
+                pass
+        if year:
+            try:
+                invoices = invoices.filter(invoice_date__year=int(year))
+            except (ValueError, TypeError):
+                pass
         invoices_list = list(invoices)
         customer_map = {}
         for inv in invoices_list:
@@ -796,19 +859,39 @@ class CustomerReportView(View):
             customer_map[key]['count'] += 1
             customer_map[key]['subtotal'] += inv.subtotal
             customer_map[key]['gross'] += inv.total
-
-        rows = sorted(customer_map.values(), key=lambda x: x['gross'], reverse=True)
-
+        rows = list(customer_map.values())
+        if sort == 'gross_asc':
+            rows.sort(key=lambda x: x['gross'])
+        elif sort == 'count_desc':
+            rows.sort(key=lambda x: x['count'], reverse=True)
+        elif sort == 'count_asc':
+            rows.sort(key=lambda x: x['count'])
+        elif sort == 'name_asc':
+            rows.sort(key=lambda x: (x['name'] or '').upper())
+        elif sort == 'name_desc':
+            rows.sort(key=lambda x: (x['name'] or '').upper(), reverse=True)
+        else:
+            rows.sort(key=lambda x: x['gross'], reverse=True)
+        total_count = sum(r['count'] for r in rows)
+        total_subtotal = sum(r['subtotal'] for r in rows)
+        total_gross = sum(r['gross'] for r in rows)
+        paginator = Paginator(rows, 100)
+        page_obj = paginator.get_page(request.GET.get('page'))
+        qs = request.GET.copy()
+        qs.pop('page', None)
         return render(request, 'invoices/customer_report.html', {
-            'rows': rows,
-            'total_count': sum(r['count'] for r in rows),
-            'total_subtotal': sum(r['subtotal'] for r in rows),
-            'total_gross': sum(r['gross'] for r in rows),
+            'rows': page_obj,
+            'page_obj': page_obj,
+            'total_count': total_count,
+            'total_subtotal': total_subtotal,
+            'total_gross': total_gross,
             'start': start or '',
             'end': end or '',
+            'month': month or '',
+            'year': year or '',
+            'sort': sort,
+            'querystring': qs.urlencode(),
         })
-
-
 
 
 @method_decorator(csrf_exempt, name='dispatch')

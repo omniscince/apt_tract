@@ -1,4 +1,4 @@
-﻿from django import forms
+from django import forms
 from django.forms import inlineformset_factory
 from django.utils import timezone
 from dateutil.relativedelta import relativedelta
@@ -87,7 +87,7 @@ class InvoiceForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-        today = timezone.now().date()
+        today = timezone.localdate()
         if not self.instance.pk:
             self.fields['invoice_date'].initial = today
             self.fields['due_date'].initial = today + relativedelta(months=1)

@@ -14,7 +14,7 @@
     <div class="ap-card" style="margin-bottom:16px;">
         <div class="ap-card-body">
             <form method="get">
-                <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+                <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;align-items:flex-end;">
                     <div style="flex:1;min-width:160px;">
                         <label class="ap-label">Customer</label>
                         <select name="customer" class="form-control">
@@ -46,12 +46,23 @@
                         <label class="ap-label">Year</label>
                         <input type="number" name="year" class="form-control" value="{{ request.GET.year }}" placeholder="All">
                     </div>
-                    <div style="flex:1;min-width:200px;">
+                    <div style="flex:1 1 320px;min-width:280px;">
                         <label class="ap-label">Date Range</label>
                         <div style="display:flex;gap:6px;">
-                            <input type="date" name="date_from" class="form-control" value="{{ request.GET.date_from }}">
-                            <input type="date" name="date_to" class="form-control" value="{{ request.GET.date_to }}">
+                            <input type="date" name="date_from" class="form-control" style="flex:1;min-width:0;" value="{{ request.GET.date_from }}">
+                            <input type="date" name="date_to" class="form-control" style="flex:1;min-width:0;" value="{{ request.GET.date_to }}">
                         </div>
+                    </div>
+                    <div style="flex:0 0 190px;">
+                        <label class="ap-label">Sort by</label>
+                        <select name="sort" class="form-control">
+                            <option value="date_desc" {% if sort == "date_desc" %}selected{% endif %}>Date (newest)</option>
+                            <option value="date_asc" {% if sort == "date_asc" %}selected{% endif %}>Date (oldest)</option>
+                            <option value="total_desc" {% if sort == "total_desc" %}selected{% endif %}>Total (high-low)</option>
+                            <option value="total_asc" {% if sort == "total_asc" %}selected{% endif %}>Total (low-high)</option>
+                            <option value="customer" {% if sort == "customer" %}selected{% endif %}>Customer (A-Z)</option>
+                            <option value="number" {% if sort == "number" %}selected{% endif %}>Invoice number</option>
+                        </select>
                     </div>
                 </div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -112,6 +123,20 @@
             </tfoot>
         </table>
     </div>
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin:18px 0;flex-wrap:wrap;">
+        {% if page_obj.has_previous %}
+        <a href="?{{ querystring }}&page=1" style="display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text);text-decoration:none;font-size:13px;font-weight:600;">&laquo;</a>
+        <a href="?{{ querystring }}&page={{ page_obj.previous_page_number }}" style="display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text);text-decoration:none;font-size:13px;font-weight:600;">Prev</a>
+        {% endif %}
+        <span style="display:inline-flex;align-items:center;height:34px;padding:0 16px;border-radius:8px;background:var(--brand);color:#fff;font-size:13px;font-weight:600;">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <a href="?{{ querystring }}&page={{ page_obj.next_page_number }}" style="display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text);text-decoration:none;font-size:13px;font-weight:600;">Next</a>
+        <a href="?{{ querystring }}&page={{ page_obj.paginator.num_pages }}" style="display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text);text-decoration:none;font-size:13px;font-weight:600;">&raquo;</a>
+        {% endif %}
+        <span style="width:100%;text-align:center;font-size:12px;color:var(--muted);margin-top:4px;">{{ page_obj.paginator.count }} invoices total</span>
+    </div>
+    {% endif %}
 
     {% else %}
     <div class="ap-card">

@@ -18,7 +18,40 @@
                 </div>
                 <div>
                     <label class="ap-label">To</label>
-                    <input type="date" name="end" value="{{ end }}" class="form-control" style="width:160px;">
+                    <input type="date" name="end" value="{{ end }}" class="form-control" style="width:150px;">
+                </div>
+                <div>
+                    <label class="ap-label">Month</label>
+                    <select name="month" class="form-control" style="width:130px;">
+                        <option value="">All</option>
+                        <option value="1" {% if month == "1" %}selected{% endif %}>January</option>
+                        <option value="2" {% if month == "2" %}selected{% endif %}>February</option>
+                        <option value="3" {% if month == "3" %}selected{% endif %}>March</option>
+                        <option value="4" {% if month == "4" %}selected{% endif %}>April</option>
+                        <option value="5" {% if month == "5" %}selected{% endif %}>May</option>
+                        <option value="6" {% if month == "6" %}selected{% endif %}>June</option>
+                        <option value="7" {% if month == "7" %}selected{% endif %}>July</option>
+                        <option value="8" {% if month == "8" %}selected{% endif %}>August</option>
+                        <option value="9" {% if month == "9" %}selected{% endif %}>September</option>
+                        <option value="10" {% if month == "10" %}selected{% endif %}>October</option>
+                        <option value="11" {% if month == "11" %}selected{% endif %}>November</option>
+                        <option value="12" {% if month == "12" %}selected{% endif %}>December</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="ap-label">Year</label>
+                    <input type="number" name="year" value="{{ year }}" placeholder="2026" class="form-control" style="width:95px;">
+                </div>
+                <div>
+                    <label class="ap-label">Sort by</label>
+                    <select name="sort" class="form-control" style="width:175px;">
+                        <option value="gross_desc" {% if sort == "gross_desc" %}selected{% endif %}>Revenue (high-low)</option>
+                        <option value="gross_asc" {% if sort == "gross_asc" %}selected{% endif %}>Revenue (low-high)</option>
+                        <option value="count_desc" {% if sort == "count_desc" %}selected{% endif %}>Invoices (most)</option>
+                        <option value="count_asc" {% if sort == "count_asc" %}selected{% endif %}>Invoices (least)</option>
+                        <option value="name_asc" {% if sort == "name_asc" %}selected{% endif %}>Name (A-Z)</option>
+                        <option value="name_desc" {% if sort == "name_desc" %}selected{% endif %}>Name (Z-A)</option>
+                    </select>
                 </div>
                 <button type="submit" class="ap-btn ap-btn-primary ap-btn-sm"><i class="bi bi-funnel"></i> Run</button>
                 <a href="{% url 'customer_report' %}" class="ap-btn ap-btn-outline ap-btn-sm">Reset</a>
@@ -68,6 +101,21 @@
             </tfoot>
             {% endif %}
         </table>
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin:18px 0;flex-wrap:wrap;">
+        {% if page_obj.has_previous %}
+        <a href="?{{ querystring }}&page=1" style="display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text);text-decoration:none;font-size:13px;font-weight:600;">&laquo;</a>
+        <a href="?{{ querystring }}&page={{ page_obj.previous_page_number }}" style="display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text);text-decoration:none;font-size:13px;font-weight:600;">Prev</a>
+        {% endif %}
+        <span style="display:inline-flex;align-items:center;height:34px;padding:0 16px;border-radius:8px;background:var(--brand);color:#fff;font-size:13px;font-weight:600;">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <a href="?{{ querystring }}&page={{ page_obj.next_page_number }}" style="display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text);text-decoration:none;font-size:13px;font-weight:600;">Next</a>
+        <a href="?{{ querystring }}&page={{ page_obj.paginator.num_pages }}" style="display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text);text-decoration:none;font-size:13px;font-weight:600;">&raquo;</a>
+        {% endif %}
+        <span style="width:100%;text-align:center;font-size:12px;color:var(--muted);margin-top:4px;">{{ page_obj.paginator.count }} customers total</span>
+    </div>
+    {% endif %}
+
     </div>
 </div>
 {% endblock %}
